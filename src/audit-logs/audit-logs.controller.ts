@@ -1,8 +1,11 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { AuditLogsService } from './audit-logs.service';
 import { CreateAuditLogDto } from './dto/audit-log.dto';
 import { PaginationDto } from '../utils/pagination.util';
 
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+@UseGuards(JwtAuthGuard)
 @Controller('audit-logs')
 export class AuditLogsController {
     constructor(private readonly auditLogsService: AuditLogsService) { }

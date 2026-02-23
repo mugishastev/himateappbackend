@@ -1,9 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { StatusesService } from './statuses.service';
 import { CreateStatusDto, UpdateStatusDto } from './dto/status.dto';
 import { PaginationDto } from '../utils/pagination.util';
 import { FileInterceptor } from '@nestjs/platform-express';
 
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+@UseGuards(JwtAuthGuard)
 @Controller('statuses')
 export class StatusesController {
     constructor(private readonly statusesService: StatusesService) { }

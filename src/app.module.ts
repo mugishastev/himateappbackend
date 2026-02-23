@@ -16,12 +16,16 @@ import { SettingsModule } from './settings/settings.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 import { UtilsModule } from './utils/utils.module';
+import { AuthModule } from './auth/auth.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     UtilsModule,
+    AuthModule,
+    ChatModule,
     UsersModule,
     RolesModule,
     PermissionsModule,

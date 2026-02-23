@@ -1,9 +1,12 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/message.dto';
 import { PaginationDto } from '../utils/pagination.util';
 import { FileInterceptor } from '@nestjs/platform-express';
 
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+@UseGuards(JwtAuthGuard)
 @Controller('messages')
 export class MessagesController {
     constructor(private readonly messagesService: MessagesService) { }

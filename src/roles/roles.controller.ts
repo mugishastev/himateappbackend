@@ -1,8 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 import { PaginationDto } from '../utils/pagination.util';
 
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+@UseGuards(JwtAuthGuard)
 @Controller('roles')
 export class RolesController {
     constructor(private readonly rolesService: RolesService) { }

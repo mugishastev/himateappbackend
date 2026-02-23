@@ -3,14 +3,24 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateNotificationDto, UpdateNotificationDto } from './dto/notification.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
 
+import { ChatGateway } from '../chat/chat.gateway';
+
 @Injectable()
 export class NotificationsService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private chatGateway: ChatGateway,
+    ) { }
 
     async create(createNotificationDto: CreateNotificationDto) {
-        return this.prisma.notification.create({
+        const notification = await this.prisma.notification.create({
             data: createNotificationDto,
         });
+
+        // Push real-time notification to the user
+        this.chatGateway.sendDirectNotification(notification.userId, notification);
+
+        return notification;
     }
 
     async findByUser(userId: number, paginationDto: PaginationDto) {

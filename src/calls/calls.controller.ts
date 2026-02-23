@@ -1,8 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { CallsService } from './calls.service';
 import { CreateCallDto, UpdateCallDto } from './dto/call.dto';
 import { PaginationDto } from '../utils/pagination.util';
 
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+@UseGuards(JwtAuthGuard)
 @Controller('calls')
 export class CallsController {
     constructor(private readonly callsService: CallsService) { }
