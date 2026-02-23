@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            Int                       @id @default(autoincrement())
+  email         String                    @unique
+  isVerified    Boolean                   @default(false)
+  username      String?
+  phoneNumber   String?                   @unique
+  password      String? // optional, niba ushaka extra login
+  profileImage  String?
+  roleId        Int?
+  role          Role?                     @relation(fields: [roleId], references: [id])
+  contacts      Contact[]                 @relation("UserContacts")
+  contactOf     Contact[]                 @relation("UserContactOf")
+  conversations ConversationParticipant[]
+  messages      Message[]                 @relation("UserMessages")
+  statuses      Status[]
+  calls         Call[]                    @relation("UserCalls")
+  receivedCalls Call[]                    @relation("UserReceivedCalls")
+  notifications Notification[]
+  settings      Setting[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime                  @default(now())
+}
+
+model Role {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique // ADMIN, MODERATOR, USER
+  permissions Permission[]
+  users       User[]
+}
+
+model Permission {
+  id     Int    @id @default(autoincrement())
+  action String // e.g. "MANAGE_USERS", "DELETE_MESSAGES"
+  roleId Int
+  role   Role   @relation(fields: [roleId], references: [id])
+}
+
+model Contact {
+  id        Int      @id @default(autoincrement())
+  ownerId   Int
+  contactId Int
+  owner     User     @relation("UserContacts", fields: [ownerId], references: [id])
+  contact   User     @relation("UserContactOf", fields: [contactId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Conversation {
+  id           Int                       @id @default(autoincrement())
+  title        String?
+  isGroup      Boolean                   @default(false)
+  participants ConversationParticipant[]
+  messages     Message[]
+  createdAt    DateTime                  @default(now())
+}
+
+model ConversationParticipant {
+  id             Int          @id @default(autoincrement())
+  userId         Int
+  conversationId Int
+  user           User         @relation(fields: [userId], references: [id])
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  joinedAt       DateTime     @default(now())
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  content        String
+  senderId       Int
+  conversationId Int
+  mediaUrl       String?
+  timestamp      DateTime     @default(now())
+  sender         User         @relation("UserMessages", fields: [senderId], references: [id])
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  attachments    Attachment[]
+}
+
+model Attachment {
+  id        Int     @id @default(autoincrement())
+  url       String
+  type      String // IMAGE, VIDEO, AUDIO, FILE
+  messageId Int
+  message   Message @relation(fields: [messageId], references: [id])
+}
+
+model Status {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  content   String
+  mediaUrl  String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Call {
+  id         Int       @id @default(autoincrement())
+  callerId   Int
+  receiverId Int
+  startedAt  DateTime
+  endedAt    DateTime?
+  type       CallType
+  caller     User      @relation("UserCalls", fields: [callerId], references: [id])
+  receiver   User      @relation("UserReceivedCalls", fields: [receiverId], references: [id])
+}
+
+enum CallType {
+  AUDIO
+  VIDEO
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String // MESSAGE, CALL, STATUS, SYSTEM
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Setting {
+  id     Int    @id @default(autoincrement())
+  userId Int
+  key    String // e.g. "theme", "language", "privacy"
+  value  String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  action    String // e.g. LOGIN, REGISTER, DELETE_MESSAGE
+  details   String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+}
