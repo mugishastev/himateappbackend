@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
+import {
+    Controller, Get, Post, Body, Param, Delete, Patch,
+    ParseIntPipe, Query, UseInterceptors, UploadedFile, UseGuards
+} from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/message.dto';
 import { PaginationDto } from '../utils/pagination.util';
 import { FileInterceptor } from '@nestjs/platform-express';
-
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
@@ -11,6 +13,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class MessagesController {
     constructor(private readonly messagesService: MessagesService) { }
 
+    /**
+     * POST /messages
+     * Send a message (supports optional media file upload via multipart/form-data).
+     */
     @Post()
     @UseInterceptors(FileInterceptor('media'))
     create(
@@ -20,6 +26,10 @@ export class MessagesController {
         return this.messagesService.create(createMessageDto, file);
     }
 
+    /**
+     * GET /messages/conversation/:id
+     * Retrieve paginated messages for a specific conversation.
+     */
     @Get('conversation/:id')
     findByConversation(
         @Param('id', ParseIntPipe) id: number,
@@ -28,8 +38,30 @@ export class MessagesController {
         return this.messagesService.findByConversation(id, paginationDto);
     }
 
+    /**
+     * GET /messages/:id
+     * Get a single message by its ID.
+     */
     @Get(':id')
     findOne(@Param('id', ParseIntPipe) id: number) {
         return this.messagesService.findOne(id);
+    }
+
+    /**
+     * PATCH /messages/:id/read
+     * Mark a message as read (and delivered). Triggers a real-time read receipt via WebSocket.
+     */
+    @Patch(':id/read')
+    markAsRead(@Param('id', ParseIntPipe) id: number) {
+        return this.messagesService.markAsRead(id);
+    }
+
+    /**
+     * DELETE /messages/:id
+     * Delete a message by its ID.
+     */
+    @Delete(':id')
+    remove(@Param('id', ParseIntPipe) id: number) {
+        return this.messagesService.remove(id);
     }
 }

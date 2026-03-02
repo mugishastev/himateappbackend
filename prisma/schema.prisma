@@ -1,10 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  engineType = "client"
 }
 
 datasource db {
   provider = "postgresql"
-
 }
 
 model User {
@@ -15,6 +15,7 @@ model User {
   phoneNumber   String?                   @unique
   password      String? // optional, niba ushaka extra login
   profileImage  String?
+  fcmToken      String? // For mobile push notifications
   roleId        Int?
   role          Role?                     @relation(fields: [roleId], references: [id])
   contacts      Contact[]                 @relation("UserContacts")
@@ -77,6 +78,8 @@ model Message {
   senderId       Int
   conversationId Int
   mediaUrl       String?
+  isDelivered    Boolean      @default(false)
+  isRead         Boolean      @default(false)
   timestamp      DateTime     @default(now())
   sender         User         @relation("UserMessages", fields: [senderId], references: [id])
   conversation   Conversation @relation(fields: [conversationId], references: [id])

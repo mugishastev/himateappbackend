@@ -23,3 +23,8 @@ export class UpdateConversationDto {
     @IsBoolean()
     isGroup?: boolean;
 }
+
+export class AddParticipantDto {
+    @IsInt()
+    userId: number;
+}

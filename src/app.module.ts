@@ -18,10 +18,15 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { UtilsModule } from './utils/utils.module';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 60 * 60, // 1 hour default cache
+    }),
     PrismaModule,
     UtilsModule,
     AuthModule,

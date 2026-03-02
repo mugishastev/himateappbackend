@@ -11,8 +11,10 @@ export class MessagesService {
         private cloudinary: CloudinaryService,
     ) { }
 
+    // ─── Create ───────────────────────────────────────────────────────────────
+
     async create(createMessageDto: CreateMessageDto, file?: Express.Multer.File) {
-        let mediaUrl = null;
+        let mediaUrl: string | null = null;
         if (file) {
             const result = await this.cloudinary.uploadImage(file);
             mediaUrl = result.secure_url;
@@ -24,8 +26,11 @@ export class MessagesService {
                 content: createMessageDto.content || '',
                 mediaUrl,
             },
+            include: { sender: true },
         });
     }
+
+    // ─── Find All in Conversation ─────────────────────────────────────────────
 
     async findByConversation(conversationId: number, paginationDto: PaginationDto) {
         const { skip, take } = getPaginationParams(paginationDto);
@@ -35,7 +40,7 @@ export class MessagesService {
                 skip,
                 take,
                 orderBy: { timestamp: 'desc' },
-                include: { sender: true },
+                include: { sender: true, attachments: true },
             }),
             this.prisma.message.count({ where: { conversationId } }),
         ]);
@@ -48,18 +53,35 @@ export class MessagesService {
         };
     }
 
+    // ─── Find One ─────────────────────────────────────────────────────────────
+
     async findOne(id: number) {
         const message = await this.prisma.message.findUnique({
             where: { id },
-            include: { sender: true },
+            include: { sender: true, attachments: true },
         });
         if (!message) throw new NotFoundException(`Message with ID ${id} not found`);
         return message;
     }
 
-    async remove(id: number) {
-        return this.prisma.message.delete({
+    // ─── Mark as Read ─────────────────────────────────────────────────────────
+
+    async markAsRead(id: number) {
+        const message = await this.prisma.message.findUnique({ where: { id } });
+        if (!message) throw new NotFoundException(`Message with ID ${id} not found`);
+
+        return this.prisma.message.update({
             where: { id },
+            data: { isRead: true, isDelivered: true },
         });
+    }
+
+    // ─── Delete ───────────────────────────────────────────────────────────────
+
+    async remove(id: number) {
+        const message = await this.prisma.message.findUnique({ where: { id } });
+        if (!message) throw new NotFoundException(`Message with ID ${id} not found`);
+
+        return this.prisma.message.delete({ where: { id } });
     }
 }

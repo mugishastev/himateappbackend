@@ -13,6 +13,8 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { UseFilters, UsePipes, ValidationPipe } from '@nestjs/common';
 
+import { FcmService } from '../notifications/fcm.service';
+
 @WebSocketGateway({
     cors: {
         origin: '*',
@@ -25,6 +27,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     constructor(
         private jwtService: JwtService,
         private prisma: PrismaService,
+        private fcmService: FcmService,
     ) { }
 
     afterInit(server: Server) {
@@ -115,16 +118,32 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         // Notify participants who might not be in the active room (Push Simulation)
         const participants = await this.prisma.conversationParticipant.findMany({
             where: { conversationId: data.conversationId },
+            include: { user: true },
         });
 
         participants.forEach(p => {
             if (p.userId !== senderId) {
+                // Emitting the socket notification first for low-latency
                 this.server.to(`user_${p.userId}`).emit('notification', {
                     type: 'MESSAGE',
                     content: data.content,
                     senderId,
                     conversationId: data.conversationId,
                 });
+
+                // If user has an FCM token, send a native mobile push notification
+                if (p.user.fcmToken) {
+                    this.fcmService.sendPushNotification(
+                        p.user.fcmToken,
+                        message.sender.username || 'New Message',
+                        data.content,
+                        {
+                            conversationId: data.conversationId.toString(),
+                            senderId: senderId.toString(),
+                            type: 'MESSAGE',
+                        },
+                    );
+                }
             }
         });
 
@@ -142,6 +161,43 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         client.to(`conversation_${data.conversationId}`).emit('userTyping', {
             userId: client.data.userId,
             isTyping: data.isTyping,
+        });
+    }
+
+    /**
+     * Marks a message as delivered once it reaches the client's device.
+     */
+    @SubscribeMessage('markDelivered')
+    async handleMarkDelivered(@MessageBody() messageId: number, @ConnectedSocket() client: Socket) {
+        const message = await this.prisma.message.update({
+            where: { id: messageId },
+            data: { isDelivered: true },
+            include: { conversation: { include: { participants: true } } }
+        });
+
+        // Notify the sender that the message was delivered
+        this.server.to(`user_${message.senderId}`).emit('messageStatusUpdate', {
+            messageId,
+            status: 'DELIVERED',
+            conversationId: message.conversationId,
+        });
+    }
+
+    /**
+     * Marks a message as read when the user opens the conversation.
+     */
+    @SubscribeMessage('markRead')
+    async handleMarkRead(@MessageBody() messageId: number, @ConnectedSocket() client: Socket) {
+        const message = await this.prisma.message.update({
+            where: { id: messageId },
+            data: { isRead: true, isDelivered: true },
+        });
+
+        // Notify the sender that the message was read (Blue Tick)
+        this.server.to(`user_${message.senderId}`).emit('messageStatusUpdate', {
+            messageId,
+            status: 'READ',
+            conversationId: message.conversationId,
         });
     }
 

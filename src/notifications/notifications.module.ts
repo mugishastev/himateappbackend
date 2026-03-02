@@ -4,10 +4,12 @@ import { NotificationsController } from './notifications.controller';
 
 import { ChatModule } from '../chat/chat.module';
 
+import { FcmService } from './fcm.service';
+
 @Module({
     imports: [ChatModule],
     controllers: [NotificationsController],
-    providers: [NotificationsService],
-    exports: [NotificationsService],
+    providers: [NotificationsService, FcmService],
+    exports: [NotificationsService, FcmService],
 })
 export class NotificationsModule { }

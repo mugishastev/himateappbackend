@@ -40,6 +40,14 @@ export class UsersController {
         return this.usersService.updateProfileImage(id, file);
     }
 
+    @Patch(':id/fcm-token')
+    async updateFcmToken(
+        @Param('id', ParseIntPipe) id: number,
+        @Body('fcmToken') fcmToken: string,
+    ) {
+        return this.usersService.updateFcmToken(id, fcmToken);
+    }
+
     @Delete(':id')
     remove(@Param('id', ParseIntPipe) id: number) {
         return this.usersService.remove(id);
