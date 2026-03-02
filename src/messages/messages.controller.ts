@@ -2,6 +2,7 @@ import {
     Controller, Get, Post, Body, Param, Delete, Patch,
     ParseIntPipe, Query, UseInterceptors, UploadedFile, UseGuards
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/message.dto';
 import { PaginationDto } from '../utils/pagination.util';
@@ -11,17 +12,18 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
+@ApiTags('Messages')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('messages')
 export class MessagesController {
     constructor(private readonly messagesService: MessagesService) { }
 
-    /**
-     * POST /messages
-     * Send a message (supports optional media file upload via multipart/form-data).
-     */
     @Post()
     @UseInterceptors(FileInterceptor('media'))
+    @ApiConsumes('multipart/form-data')
+    @ApiOperation({ summary: 'Send a message' })
+    @ApiResponse({ status: 201, description: 'Message sent successfully' })
     create(
         @Body() createMessageDto: CreateMessageDto,
         @UploadedFile() file?: Express.Multer.File,
@@ -29,11 +31,9 @@ export class MessagesController {
         return this.messagesService.create(createMessageDto, file);
     }
 
-    /**
-     * GET /messages/conversation/:id
-     * Retrieve paginated messages for a specific conversation.
-     */
     @Get('conversation/:id')
+    @ApiOperation({ summary: 'Get messages for a conversation' })
+    @ApiResponse({ status: 200, description: 'Return paginated messages' })
     findByConversation(
         @Param('id', ParseIntPipe) id: number,
         @Query() paginationDto: PaginationDto,
@@ -42,29 +42,23 @@ export class MessagesController {
         return this.messagesService.findByConversation(id, user.id, user.role, paginationDto);
     }
 
-    /**
-     * GET /messages/:id
-     * Get a single message by its ID.
-     */
     @Get(':id')
+    @ApiOperation({ summary: 'Get a single message by ID' })
+    @ApiResponse({ status: 200, description: 'Return message details' })
     findOne(@Param('id', ParseIntPipe) id: number) {
         return this.messagesService.findOne(id);
     }
 
-    /**
-     * PATCH /messages/:id/read
-     * Mark a message as read (and delivered). Triggers a real-time read receipt via WebSocket.
-     */
     @Patch(':id/read')
+    @ApiOperation({ summary: 'Mark message as read' })
+    @ApiResponse({ status: 200, description: 'Message marked as read' })
     markAsRead(@Param('id', ParseIntPipe) id: number) {
         return this.messagesService.markAsRead(id);
     }
 
-    /**
-     * DELETE /messages/:id
-     * Delete a message by its ID.
-     */
     @Delete(':id')
+    @ApiOperation({ summary: 'Delete a message' })
+    @ApiResponse({ status: 200, description: 'Message deleted (soft delete)' })
     remove(
         @Param('id', ParseIntPipe) id: number,
         @CurrentUser() user: any,

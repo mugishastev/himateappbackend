@@ -1,55 +1,69 @@
 import { IsEmail, IsOptional, IsString, IsBoolean, IsInt } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateUserDto {
+    @ApiProperty({ example: 'user@example.com' })
     @IsEmail()
     email: string;
 
+    @ApiProperty({ example: 'john_doe', required: false })
     @IsOptional()
     @IsString()
     username?: string;
 
+    @ApiProperty({ example: '+1234567890', required: false })
     @IsOptional()
     @IsString()
     phoneNumber?: string;
 
+    @ApiProperty({ example: 'password123', required: false })
     @IsOptional()
     @IsString()
     password?: string;
 
+    @ApiProperty({ example: 'https://example.com/profile.jpg', required: false })
     @IsOptional()
     @IsString()
     profileImage?: string;
 
+    @ApiProperty({ example: 1, required: false })
     @IsOptional()
     @IsInt()
     roleId?: number;
 }
 
 export class UpdateUserDto {
+    @ApiProperty({ example: 'user@example.com', required: false })
     @IsOptional()
     @IsEmail()
     email?: string;
 
+    @ApiProperty({ example: true, required: false })
     @IsOptional()
     @IsBoolean()
     isVerified?: boolean;
 
+    @ApiProperty({ example: 'john_doe_updated', required: false })
     @IsOptional()
     @IsString()
     username?: string;
 
+    @ApiProperty({ example: '+0987654321', required: false })
     @IsOptional()
     @IsString()
     phoneNumber?: string;
 
+    @ApiProperty({ example: 'newpassword123', required: false })
     @IsOptional()
     @IsString()
     password?: string;
 
+    @ApiProperty({ example: 'https://example.com/new-profile.jpg', required: false })
     @IsOptional()
     @IsString()
     profileImage?: string;
 
+    @ApiProperty({ example: 2, required: false })
     @IsOptional()
     @IsInt()
     roleId?: number;

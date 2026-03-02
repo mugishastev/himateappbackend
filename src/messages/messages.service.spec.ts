@@ -3,20 +3,11 @@ import { MessagesService } from './messages.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../utils/cloudinary.service';
 import { NotFoundException } from '@nestjs/common';
+import { mockPrismaService } from '../../test/mocks/prisma.service.mock';
 
 describe('MessagesService', () => {
     let service: MessagesService;
     let prisma: PrismaService;
-
-    const mockPrismaService = {
-        message: {
-            create: jest.fn(),
-            findMany: jest.fn(),
-            findUnique: jest.fn(),
-            update: jest.fn(),
-            count: jest.fn(),
-        },
-    };
 
     const mockCloudinaryService = {
         uploadImage: jest.fn(),

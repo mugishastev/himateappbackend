@@ -8,6 +8,7 @@ import { Redis } from 'ioredis';
 import helmet from 'helmet';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
@@ -28,6 +29,16 @@ class RedisIoAdapter extends IoAdapter {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Swagger Documentation
+  const config = new DocumentBuilder()
+    .setTitle('Himate API')
+    .setDescription('The Himate Chat Application API documentation')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
   // Security
   app.use(helmet());
   app.enableCors({
@@ -41,6 +52,7 @@ async function bootstrap() {
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
+    stopAtFirstError: true,
   }));
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());

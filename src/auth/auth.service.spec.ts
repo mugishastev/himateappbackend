@@ -5,21 +5,11 @@ import { JwtService } from '@nestjs/jwt';
 import { MailService } from '../utils/mail.service';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { mockPrismaService } from '../../test/mocks/prisma.service.mock';
 
 describe('AuthService', () => {
     let service: AuthService;
     let prisma: PrismaService;
-
-    const mockPrismaService = {
-        user: {
-            findUnique: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
-        },
-        auditLog: {
-            create: jest.fn(),
-        },
-    };
 
     const mockJwtService = {
         sign: jest.fn().mockReturnValue('mock-token'),
@@ -57,6 +47,7 @@ describe('AuthService', () => {
 
         it('should create a user and send OTP', async () => {
             mockPrismaService.user.findUnique.mockResolvedValue(null);
+            mockPrismaService.role.findUnique.mockResolvedValue({ id: 1, name: 'USER' });
             mockPrismaService.user.create.mockResolvedValue({ id: 1, email: 'test@test.com' });
 
             const result = await service.register({ email: 'test@test.com', password: 'password' });
