@@ -78,10 +78,16 @@ export class AuthService {
 
         if (!user.isVerified) throw new UnauthorizedException('Please verify your email before logging in');
 
-        // Log audit
-        await this.prisma.auditLog.create({
-            data: { userId: user.id, action: 'LOGIN', details: `User ${user.email} logged in` },
-        });
+        // Log audit and update lastSeen
+        await Promise.all([
+            this.prisma.auditLog.create({
+                data: { userId: user.id, action: 'LOGIN', details: `User ${user.email} logged in` },
+            }),
+            this.prisma.user.update({
+                where: { id: user.id },
+                data: { lastSeen: new Date() },
+            }),
+        ]);
 
         return this.generateTokens(user.id, user.email);
     }
@@ -141,6 +147,26 @@ export class AuthService {
         }
 
         return { message: 'Password reset successfully. You can now log in with your new password.' };
+    }
+
+    // ─── Profile ──────────────────────────────────────────────────────────────
+
+    async getProfile(userId: number) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                username: true,
+                phoneNumber: true,
+                profileImage: true,
+                lastSeen: true,
+                isVerified: true,
+                createdAt: true,
+            }
+        });
+        if (!user) throw new NotFoundException('User not found');
+        return user;
     }
 
     // ─── Validate User (used by JWT Strategy) ────────────────────────────────

@@ -5,6 +5,9 @@ import { AppModule } from './app.module';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Redis } from 'ioredis';
+import helmet from 'helmet';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
@@ -23,21 +26,31 @@ class RedisIoAdapter extends IoAdapter {
 }
 
 async function bootstrap() {
-  console.log('DATABASE_URL starts with:', process.env.DATABASE_URL?.substring(0, 20));
   const app = await NestFactory.create(AppModule);
 
-  // Setup Redis Adapter for Distributed WebSockets
-  const redisIoAdapter = new RedisIoAdapter(app);
-  await redisIoAdapter.connectToRedis();
-  app.useWebSocketAdapter(redisIoAdapter);
+  // Security
+  app.use(helmet());
+  app.enableCors({
+    origin: true, // In production, replace with specific domains
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
 
-  // Enable global validation for all DTOs
+  // Global Hooks
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
   }));
+  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(new TransformInterceptor());
+
+  // WebSocket Adapter
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   await app.listen(process.env.PORT ?? 5000);
+  console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

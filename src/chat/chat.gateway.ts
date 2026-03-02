@@ -38,6 +38,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         try {
             const token = client.handshake.auth.token?.split(' ')[1];
             if (!token) {
+                console.log('No token provided, disconnecting client');
                 client.disconnect();
                 return;
             }
@@ -50,30 +51,57 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
             // Join special room for user notifications/direct emits
             client.join(`user_${payload.sub}`);
 
-            // Broadcast online status
+            // Update user status to online in database
+            await this.prisma.user.update({
+                where: { id: payload.sub },
+                data: { lastSeen: new Date() },
+            });
+
+            // Broadcast online status to others
             this.server.emit('presence', { userId: payload.sub, status: 'online' });
         } catch (e) {
+            console.error('Connection error:', e.message);
             client.disconnect();
         }
     }
 
-    handleDisconnect(client: Socket) {
+    async handleDisconnect(client: Socket) {
         if (client.data.userId) {
-            console.log(`User disconnected: ${client.data.userId}`);
-            this.server.emit('presence', { userId: client.data.userId, status: 'offline' });
+            const userId = client.data.userId;
+            console.log(`User disconnected: ${userId}`);
+
+            // Update lastSeen in database
+            await this.prisma.user.update({
+                where: { id: userId },
+                data: { lastSeen: new Date() },
+            });
+
+            this.server.emit('presence', { userId, status: 'offline' });
         }
     }
 
-    @SubscribeMessage('joinRoom')
-    handleJoinRoom(@MessageBody() conversationId: number, @ConnectedSocket() client: Socket) {
+    @SubscribeMessage('joinConversation')
+    async handleJoinRoom(@MessageBody() conversationId: number, @ConnectedSocket() client: Socket) {
+        // Verify user is a participant
+        const isParticipant = await this.prisma.conversationParticipant.findFirst({
+            where: { conversationId, userId: client.data.userId },
+        });
+
+        if (!isParticipant) {
+            console.log(`Unauthorized room join attempt: user ${client.data.userId} -> room ${conversationId}`);
+            return { error: 'Unauthorized' };
+        }
+
         client.join(`conversation_${conversationId}`);
         console.log(`User ${client.data.userId} joined room ${conversationId}`);
+        return { success: true };
     }
 
-    @SubscribeMessage('leaveRoom')
+    @SubscribeMessage('leaveConversation')
     handleLeaveRoom(@MessageBody() conversationId: number, @ConnectedSocket() client: Socket) {
         client.leave(`conversation_${conversationId}`);
         console.log(`User ${client.data.userId} left room ${conversationId}`);
+        return { success: true };
     }
 
     /**
@@ -123,16 +151,19 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
         participants.forEach(p => {
             if (p.userId !== senderId) {
+                const userRoom = `user_${p.userId}`;
+                const isOnline = this.server.sockets.adapter.rooms.get(userRoom)?.size > 0;
+
                 // Emitting the socket notification first for low-latency
-                this.server.to(`user_${p.userId}`).emit('notification', {
+                this.server.to(userRoom).emit('notification', {
                     type: 'MESSAGE',
                     content: data.content,
                     senderId,
                     conversationId: data.conversationId,
                 });
 
-                // If user has an FCM token, send a native mobile push notification
-                if (p.user.fcmToken) {
+                // If user is offline and has an FCM token, send a native mobile push notification
+                if (!isOnline && p.user.fcmToken) {
                     this.fcmService.sendPushNotification(
                         p.user.fcmToken,
                         message.sender.username || 'New Message',

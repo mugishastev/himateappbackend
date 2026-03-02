@@ -49,14 +49,18 @@ export class ConversationsService {
     async findByUser(userId: number, paginationDto: PaginationDto) {
         const { skip, take } = getPaginationParams(paginationDto);
 
-        const [data, total] = await Promise.all([
+        const [rawConversations, total] = await Promise.all([
             this.prisma.conversation.findMany({
                 where: { participants: { some: { userId } } },
                 skip,
                 take,
                 include: {
                     participants: { include: { user: true } },
-                    messages: { take: 1, orderBy: { timestamp: 'desc' } },
+                    messages: {
+                        where: { isDeleted: false },
+                        take: 1,
+                        orderBy: { timestamp: 'desc' },
+                    },
                 },
                 orderBy: { createdAt: 'desc' },
             }),
@@ -64,6 +68,20 @@ export class ConversationsService {
                 where: { participants: { some: { userId } } },
             }),
         ]);
+
+        const data = await Promise.all(
+            rawConversations.map(async (conv) => {
+                const unreadCount = await this.prisma.message.count({
+                    where: {
+                        conversationId: conv.id,
+                        senderId: { not: userId },
+                        isRead: false,
+                        isDeleted: false,
+                    },
+                });
+                return { ...conv, unreadCount };
+            }),
+        );
 
         return { data, total, page: paginationDto.page, limit: paginationDto.limit };
     }
@@ -76,6 +94,7 @@ export class ConversationsService {
             include: {
                 participants: { include: { user: true } },
                 messages: {
+                    where: { isDeleted: false },
                     take: 50,
                     orderBy: { timestamp: 'desc' },
                     include: { sender: true, attachments: true },
@@ -125,6 +144,13 @@ export class ConversationsService {
     // ─── Delete ───────────────────────────────────────────────────────────────
 
     async remove(id: number) {
-        return this.prisma.conversation.delete({ where: { id } });
+        return this.prisma.conversation.update({
+            where: { id },
+            data: {
+                participants: {
+                    deleteMany: {},
+                },
+            }
+        }).then(() => this.prisma.conversation.delete({ where: { id } }));
     }
 }

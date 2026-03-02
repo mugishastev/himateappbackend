@@ -36,13 +36,13 @@ export class MessagesService {
         const { skip, take } = getPaginationParams(paginationDto);
         const [data, total] = await Promise.all([
             this.prisma.message.findMany({
-                where: { conversationId },
+                where: { conversationId, isDeleted: false },
                 skip,
                 take,
                 orderBy: { timestamp: 'desc' },
                 include: { sender: true, attachments: true },
             }),
-            this.prisma.message.count({ where: { conversationId } }),
+            this.prisma.message.count({ where: { conversationId, isDeleted: false } }),
         ]);
 
         return {
@@ -82,6 +82,22 @@ export class MessagesService {
         const message = await this.prisma.message.findUnique({ where: { id } });
         if (!message) throw new NotFoundException(`Message with ID ${id} not found`);
 
-        return this.prisma.message.delete({ where: { id } });
+        return this.prisma.message.update({
+            where: { id },
+            data: { isDeleted: true },
+        });
+    }
+
+    // ─── Unread Count ─────────────────────────────────────────────────────────
+
+    async countUnread(userId: number, conversationId: number) {
+        return this.prisma.message.count({
+            where: {
+                conversationId,
+                senderId: { not: userId },
+                isRead: false,
+                isDeleted: false,
+            },
+        });
     }
 }

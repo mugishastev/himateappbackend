@@ -1,7 +1,8 @@
 import {
-    Controller, Post, Body, HttpCode, HttpStatus,
+    Controller, Get, Post, Body, HttpCode, HttpStatus,
     Patch, UseGuards, Request
 } from '@nestjs/common';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ResendOtpDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -86,13 +87,23 @@ export class AuthController {
     // ─── Protected Routes ─────────────────────────────────────────────────────
 
     /**
+     * GET /auth/profile (requires Bearer token)
+     * Returns the current authenticated user's profile.
+     */
+    @Get('profile')
+    @UseGuards(JwtAuthGuard)
+    getProfile(@CurrentUser() user: any) {
+        return this.authService.getProfile(user.id);
+    }
+
+    /**
      * POST /auth/logout  (requires Bearer token)
      * Records a logout audit log for the authenticated user.
      */
     @Post('logout')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
-    logout(@Request() req: any) {
-        return this.authService.logout(req.user.id);
+    logout(@CurrentUser() user: any) {
+        return this.authService.logout(user.id);
     }
 }
