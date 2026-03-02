@@ -34,4 +34,7 @@ export const envValidationSchema = Joi.object({
     CLOUDINARY_CLOUD_NAME: Joi.string().required(),
     CLOUDINARY_API_KEY: Joi.string().required(),
     CLOUDINARY_API_SECRET: Joi.string().required(),
+
+    // App URL
+    APP_URL: Joi.string().uri().default('http://localhost:5000'),
 });

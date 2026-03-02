@@ -38,6 +38,9 @@ async function bootstrap() {
     .setTitle('Himate API')
     .setDescription('The Himate Chat Application API documentation')
     .setVersion('1.0')
+    .addServer('http://localhost:5000', 'Local Environment')
+    .addServer('https://himateappbackend.vercel.app', 'Production Environment')
+    .addServer(process.env.APP_URL || 'http://localhost:5000', 'Current Environment')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
@@ -46,7 +49,12 @@ async function bootstrap() {
   // Security
   app.use(helmet());
   app.enableCors({
-    origin: true, // In production, replace with specific domains
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'https://himateappbackend.vercel.app',
+      /\.vercel\.app$/, // Allow all vercel preview branches
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
