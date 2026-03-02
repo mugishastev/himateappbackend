@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateConversationDto, UpdateConversationDto } from './dto/conversation.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
@@ -46,12 +46,15 @@ export class ConversationsService {
 
     // ─── Find by User ─────────────────────────────────────────────────────────
 
-    async findByUser(userId: number, paginationDto: PaginationDto) {
+    async findByUser(userId: number, userRole: string, paginationDto: PaginationDto) {
         const { skip, take } = getPaginationParams(paginationDto);
+
+        // If ADMIN, don't filter by participation
+        const where = userRole === 'ADMIN' ? {} : { participants: { some: { userId } } };
 
         const [rawConversations, total] = await Promise.all([
             this.prisma.conversation.findMany({
-                where: { participants: { some: { userId } } },
+                where,
                 skip,
                 take,
                 include: {
@@ -64,9 +67,7 @@ export class ConversationsService {
                 },
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prisma.conversation.count({
-                where: { participants: { some: { userId } } },
-            }),
+            this.prisma.conversation.count({ where }),
         ]);
 
         const data = await Promise.all(
@@ -88,7 +89,7 @@ export class ConversationsService {
 
     // ─── Find One ─────────────────────────────────────────────────────────────
 
-    async findOne(id: number) {
+    async findOne(id: number, userId: number, userRole: string) {
         const conversation = await this.prisma.conversation.findUnique({
             where: { id },
             include: {
@@ -101,7 +102,15 @@ export class ConversationsService {
                 },
             },
         });
+
         if (!conversation) throw new NotFoundException(`Conversation with ID ${id} not found`);
+
+        // If not ADMIN, verify participation
+        if (userRole !== 'ADMIN') {
+            const isParticipant = conversation.participants.some(p => p.userId === userId);
+            if (!isParticipant) throw new UnauthorizedException('You are not a participant in this conversation');
+        }
+
         return conversation;
     }
 

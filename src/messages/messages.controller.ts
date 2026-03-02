@@ -7,8 +7,11 @@ import { CreateMessageDto } from './dto/message.dto';
 import { PaginationDto } from '../utils/pagination.util';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('messages')
 export class MessagesController {
     constructor(private readonly messagesService: MessagesService) { }
@@ -34,8 +37,9 @@ export class MessagesController {
     findByConversation(
         @Param('id', ParseIntPipe) id: number,
         @Query() paginationDto: PaginationDto,
+        @CurrentUser() user: any,
     ) {
-        return this.messagesService.findByConversation(id, paginationDto);
+        return this.messagesService.findByConversation(id, user.id, user.role, paginationDto);
     }
 
     /**
@@ -61,7 +65,10 @@ export class MessagesController {
      * Delete a message by its ID.
      */
     @Delete(':id')
-    remove(@Param('id', ParseIntPipe) id: number) {
-        return this.messagesService.remove(id);
+    remove(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() user: any,
+    ) {
+        return this.messagesService.remove(id, user.id, user.role);
     }
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMessageDto } from './dto/message.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
@@ -32,7 +32,15 @@ export class MessagesService {
 
     // ─── Find All in Conversation ─────────────────────────────────────────────
 
-    async findByConversation(conversationId: number, paginationDto: PaginationDto) {
+    async findByConversation(conversationId: number, userId: number, userRole: string, paginationDto: PaginationDto) {
+        // If not ADMIN, verify participation in the conversation
+        if (userRole !== 'ADMIN') {
+            const isParticipant = await this.prisma.conversationParticipant.findFirst({
+                where: { conversationId, userId },
+            });
+            if (!isParticipant) throw new UnauthorizedException('You are not a participant in this conversation');
+        }
+
         const { skip, take } = getPaginationParams(paginationDto);
         const [data, total] = await Promise.all([
             this.prisma.message.findMany({
@@ -78,9 +86,14 @@ export class MessagesService {
 
     // ─── Delete ───────────────────────────────────────────────────────────────
 
-    async remove(id: number) {
+    async remove(id: number, userId: number, userRole: string) {
         const message = await this.prisma.message.findUnique({ where: { id } });
         if (!message) throw new NotFoundException(`Message with ID ${id} not found`);
+
+        // Only sender or ADMIN/MODERATOR can delete
+        if (message.senderId !== userId && userRole !== 'ADMIN' && userRole !== 'MODERATOR') {
+            throw new UnauthorizedException('You can only delete your own messages');
+        }
 
         return this.prisma.message.update({
             where: { id },

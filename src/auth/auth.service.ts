@@ -26,8 +26,21 @@ export class AuthService {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
+
+        let userRole = await this.prisma.role.findUnique({ where: { name: 'USER' } });
+        if (!userRole) {
+            userRole = await this.prisma.role.create({ data: { name: 'USER' } });
+        }
+
         const user = await this.prisma.user.create({
-            data: { email, password: hashedPassword, username, phoneNumber, isVerified: false },
+            data: {
+                email,
+                password: hashedPassword,
+                username,
+                phoneNumber,
+                isVerified: false,
+                roleId: userRole.id
+            },
         });
 
         // Generate + send verification OTP
@@ -178,11 +191,22 @@ export class AuthService {
     // ─── Private Helpers ──────────────────────────────────────────────────────
 
     private async generateTokens(userId: number, email: string) {
-        const payload = { sub: userId, email };
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            include: { role: true },
+        });
+
+        const payload = {
+            sub: userId,
+            email,
+            role: user?.role?.name || 'USER'
+        };
+
         return {
             accessToken: this.jwtService.sign(payload, { expiresIn: '15m' }),
             refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
             userId,
+            role: payload.role,
         };
     }
 

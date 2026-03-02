@@ -6,8 +6,11 @@ import { ConversationsService } from './conversations.service';
 import { CreateConversationDto, UpdateConversationDto, AddParticipantDto } from './dto/conversation.dto';
 import { PaginationDto } from '../utils/pagination.util';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('conversations')
 export class ConversationsController {
     constructor(private readonly conversationsService: ConversationsService) { }
@@ -27,6 +30,7 @@ export class ConversationsController {
      * Get all conversations (paginated).
      */
     @Get()
+    @Roles('ADMIN')
     findAll(@Query() paginationDto: PaginationDto) {
         return this.conversationsService.findAll(paginationDto);
     }
@@ -40,8 +44,9 @@ export class ConversationsController {
     findByUser(
         @Param('userId', ParseIntPipe) userId: number,
         @Query() paginationDto: PaginationDto,
+        @CurrentUser() currentUser: any,
     ) {
-        return this.conversationsService.findByUser(userId, paginationDto);
+        return this.conversationsService.findByUser(userId, currentUser.role, paginationDto);
     }
 
     /**
@@ -49,8 +54,11 @@ export class ConversationsController {
      * Get a single conversation with its participants and recent messages.
      */
     @Get(':id')
-    findOne(@Param('id', ParseIntPipe) id: number) {
-        return this.conversationsService.findOne(id);
+    findOne(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() user: any,
+    ) {
+        return this.conversationsService.findOne(id, user.id, user.role);
     }
 
     /**
