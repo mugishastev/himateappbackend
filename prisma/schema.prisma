@@ -14,6 +14,7 @@ model User {
   phoneNumber   String?                   @unique
   password      String? // optional, niba ushaka extra login
   profileImage  String?
+  bio           String?
   fcmToken      String? // For mobile push notifications
   lastSeen      DateTime?                 @default(now())
   roleId        Int?

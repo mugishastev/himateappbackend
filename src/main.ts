@@ -33,6 +33,8 @@ class RedisIoAdapter extends IoAdapter {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.setGlobalPrefix('api');
+
   // Swagger Documentation
   const config = new DocumentBuilder()
     .setTitle('Himate API')

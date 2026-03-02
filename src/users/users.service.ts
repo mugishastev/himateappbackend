@@ -19,13 +19,24 @@ export class UsersService {
 
     async findAll(paginationDto: PaginationDto) {
         const { skip, take } = getPaginationParams(paginationDto);
+        const { search } = paginationDto;
+
+        const where = search ? {
+            OR: [
+                { username: { contains: search, mode: 'insensitive' as const } },
+                { email: { contains: search, mode: 'insensitive' as const } },
+            ],
+        } : {};
+
         const [data, total] = await Promise.all([
             this.prisma.user.findMany({
+                where,
                 skip,
                 take,
                 include: { role: true },
+                orderBy: { username: 'asc' },
             }),
-            this.prisma.user.count(),
+            this.prisma.user.count({ where }),
         ]);
 
         return {

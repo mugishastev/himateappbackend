@@ -60,10 +60,16 @@ export class AuthService {
 
         await this.prisma.user.update({ where: { email }, data: { isVerified: true } });
 
-        const user = await this.prisma.user.findUnique({ where: { email } });
+        const user = await this.prisma.user.findUnique({
+            where: { email },
+            select: { id: true, email: true, username: true, profileImage: true, bio: true }
+        });
+        const tokens = await this.generateTokens(user!.id, user!.email);
+
         return {
             message: 'Email verified successfully.',
-            ...(user ? await this.generateTokens(user.id, user.email) : {}),
+            user,
+            ...tokens,
         };
     }
 
@@ -102,7 +108,13 @@ export class AuthService {
             }),
         ]);
 
-        return this.generateTokens(user.id, user.email);
+        const tokens = await this.generateTokens(user.id, user.email);
+        const { password: _, ...userWithoutPassword } = user;
+
+        return {
+            ...tokens,
+            user: userWithoutPassword,
+        };
     }
 
     // ─── Logout ───────────────────────────────────────────────────────────────
@@ -173,6 +185,7 @@ export class AuthService {
                 username: true,
                 phoneNumber: true,
                 profileImage: true,
+                bio: true,
                 lastSeen: true,
                 isVerified: true,
                 createdAt: true,
