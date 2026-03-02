@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateNotificationDto, UpdateNotificationDto } from './dto/notification.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
@@ -9,6 +9,7 @@ import { ChatGateway } from '../chat/chat.gateway';
 export class NotificationsService {
     constructor(
         private prisma: PrismaService,
+        @Inject(forwardRef(() => ChatGateway))
         private chatGateway: ChatGateway,
     ) { }
 

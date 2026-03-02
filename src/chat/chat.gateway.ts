@@ -11,7 +11,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { UseFilters, UsePipes, ValidationPipe } from '@nestjs/common';
+import { UseFilters, UsePipes, ValidationPipe, Inject, forwardRef } from '@nestjs/common';
 
 import { FcmService } from '../notifications/fcm.service';
 
@@ -27,6 +27,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     constructor(
         private jwtService: JwtService,
         private prisma: PrismaService,
+        @Inject(forwardRef(() => FcmService))
         private fcmService: FcmService,
     ) { }
 

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
 
@@ -7,7 +7,7 @@ import { ChatModule } from '../chat/chat.module';
 import { FcmService } from './fcm.service';
 
 @Module({
-    imports: [ChatModule],
+    imports: [forwardRef(() => ChatModule)],
     controllers: [NotificationsController],
     providers: [NotificationsService, FcmService],
     exports: [NotificationsService, FcmService],
