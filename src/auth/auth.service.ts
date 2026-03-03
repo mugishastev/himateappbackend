@@ -198,7 +198,10 @@ export class AuthService {
     // ─── Validate User (used by JWT Strategy) ────────────────────────────────
 
     async validateUser(userId: number) {
-        return this.prisma.user.findUnique({ where: { id: userId } });
+        return this.prisma.user.findUnique({
+            where: { id: userId },
+            include: { role: true }
+        });
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
@@ -216,8 +219,8 @@ export class AuthService {
         };
 
         return {
-            accessToken: this.jwtService.sign(payload, { expiresIn: '15m' }),
-            refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
+            accessToken: this.jwtService.sign(payload, { expiresIn: '2h' }),
+            refreshToken: this.jwtService.sign(payload, { expiresIn: '30d' }),
             userId,
             role: payload.role,
         };
