@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStatusDto, UpdateStatusDto } from './dto/status.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
@@ -20,8 +20,12 @@ export class StatusesService {
 
         return this.prisma.status.create({
             data: {
-                ...createStatusDto,
+                content: createStatusDto.content,
+                expiresAt: createStatusDto.expiresAt,
                 mediaUrl,
+                user: {
+                    connect: { id: createStatusDto.userId! },
+                },
             },
         });
     }
@@ -76,14 +80,26 @@ export class StatusesService {
         return status;
     }
 
-    async update(id: number, updateStatusDto: UpdateStatusDto) {
+    async update(id: number, updateStatusDto: UpdateStatusDto, currentUserId: number, currentUserRole: any) {
+        const status = await this.findOne(id);
+        const roleName = typeof currentUserRole === 'string' ? currentUserRole : currentUserRole?.name;
+        if (status.userId !== currentUserId && roleName !== 'ADMIN') {
+            throw new UnauthorizedException('You can only update your own status');
+        }
+
         return this.prisma.status.update({
             where: { id },
             data: updateStatusDto,
         });
     }
 
-    async remove(id: number) {
+    async remove(id: number, currentUserId: number, currentUserRole: any) {
+        const status = await this.findOne(id);
+        const roleName = typeof currentUserRole === 'string' ? currentUserRole : currentUserRole?.name;
+        if (status.userId !== currentUserId && roleName !== 'ADMIN') {
+            throw new UnauthorizedException('You can only delete your own status');
+        }
+
         return this.prisma.status.delete({
             where: { id },
         });

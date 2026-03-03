@@ -26,6 +26,11 @@ export class CreateUserDto {
     @IsString()
     profileImage?: string;
 
+    @ApiProperty({ example: 'Passionate about tech and messaging apps', required: false })
+    @IsOptional()
+    @IsString()
+    bio?: string;
+
     @ApiProperty({ example: 1, required: false })
     @IsOptional()
     @IsInt()
@@ -62,6 +67,11 @@ export class UpdateUserDto {
     @IsOptional()
     @IsString()
     profileImage?: string;
+
+    @ApiProperty({ example: 'Building secure chat products', required: false })
+    @IsOptional()
+    @IsString()
+    bio?: string;
 
     @ApiProperty({ example: 2, required: false })
     @IsOptional()

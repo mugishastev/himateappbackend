@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
@@ -64,7 +64,11 @@ export class UsersService {
     }
 
     async updateProfileImage(id: number, file: Express.Multer.File) {
-        const user = await this.findOne(id);
+        if (!file) {
+            throw new BadRequestException('Image file is required');
+        }
+
+        await this.findOne(id);
         const result = await this.cloudinary.uploadImage(file);
 
         return this.prisma.user.update({

@@ -1,105 +1,64 @@
-# Himate Backend Project
+# Himate Backend
 
-A production-ready, high-performance NestJS backend for a modern chat application. Built with scalability, security, and developer experience in mind.
+NestJS backend for the Himate chat application.
 
-## 🚀 Features
+## Stack
 
-- **RBAC (Role-Based Access Control):** Granular permissions for Admins, Moderators, and Users.
-- **Real-time Communication:** Powered by WebSockets (Socket.IO) with Redis scaling.
-- **Robust Security:** Environment validation (Joi), Helmet, Rate Limiting, and JWT authentication.
-- **Media Management:** Integrated with Cloudinary for seamless profile and chat media uploads.
-- **Push Notifications:** Firebase Cloud Messaging (FCM) integration.
-- **API Documentation:** Interactive Swagger UI at `/api`.
-- **Production Infrastructure:** Multi-stage Docker optimization and CI/CD ready.
+- NestJS 11
+- Prisma + PostgreSQL
+- Redis + Socket.IO (real-time)
+- JWT authentication + RBAC
+- Firebase Admin (push notifications)
+- Cloudinary (media uploads)
 
-## 🛠 Tech Stack
+## Requirements
 
-- **Framework:** NestJS (Node.js)
-- **Database:** PostgreSQL (via Prisma ORM)
-- **Cache/PubSub:** Redis
-- **Real-time:** Socket.IO
-- **Validation:** Class-validator & Joi
-- **Auth:** JWT (Access + Refresh tokens)
-- **CI/CD:** GitHub Actions
-- **Containerization:** Docker & Docker Compose
+- Node.js 24+ (matches `package.json` engines)
+- PostgreSQL
+- Redis
 
-## 📦 Project Structure
+## Environment Setup
 
-```text
-src/
-├── auth/           # Authentication & Authorization logic
-├── common/         # Shared decorators, guards, filters, interceptors
-├── config/         # Environment & App configuration
-├── conversations/  # Chat conversation management
-├── messages/       # Message handling & media attachments
-├── prisma/         # Database schema & client management
-├── users/          # User management & profiles
-├── utils/          # Service utilities (Mail, Cloudinary, FCM)
-└── main.ts         # Application entry point
-```
+1. Copy `.env.example` to `.env`.
+2. Fill all required values.
+3. Keep `APP_URL` aligned with your running backend URL (default `http://localhost:5000`).
 
-## ⚙️ Environment Variables
+Main required keys are validated in `src/config/env.validation.ts`:
 
-See [.env.example](.env.example) for a complete list of required variables.
+- `PORT`, `APP_URL`
+- `DATABASE_URL`
+- `JWT_SECRET`, `REFRESH_TOKEN_SECRET`
+- `REDIS_URL`
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`
+- `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Application port | `5000` |
-| `DATABASE_URL` | PostgreSQL connection string | - |
-| `JWT_SECRET` | Secret for signing access tokens | - |
-| `REDIS_URL` | Redis connection URL | - |
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js (v18+)
-- Docker & Docker Compose (Optional but recommended)
-
-### Quick Start (Docker)
+## Local Development
 
 ```bash
-docker-compose up -d
+npm install
+npx prisma generate
+npx prisma migrate dev
+npx prisma db seed
+npm run start:dev
 ```
 
-### Manual Installation
+API base URL: `http://localhost:5000/api`
 
-1. **Install Dependencies:**
-   ```bash
-   npm install
-   ```
+Swagger UI: `http://localhost:5000/api` (served on the same prefix as the API root)
 
-2. **Generate Prisma Client:**
-   ```bash
-   npx prisma generate
-   ```
+## Scripts
 
-3. **Run Migrations & Seed Data:**
-   ```bash
-   npx prisma migrate dev
-   npx prisma seed
-   ```
+- `npm run start:dev` - start in watch mode
+- `npm run build` - build production bundle
+- `npm run start:prod` - run compiled app
+- `npm run test` - run unit tests
+- `npm run test:cov` - run tests with coverage
+- `npm run lint` - run eslint
+- `npm run prisma:generate` - regenerate Prisma client
+- `npm run prisma:migrate` - run development migrations
+- `npm run prisma:studio` - open Prisma Studio
 
-4. **Start the Application:**
-   ```bash
-   npm run start:dev
-   ```
+## Docker
 
-## 🧪 Testing
-
-```bash
-# Unit tests
-npm test
-
-# Test coverage
-npm run test:cov
-```
-
-## 📖 API Documentation
-
-Once the server is running, visit:
-`http://localhost:5000/api`
-
-## 👨‍💻 Author
-
-Built for Himate App.
+Use the included `docker-compose.yml` for local infra/app startup.

@@ -7,6 +7,7 @@ import { CreateStatusDto, UpdateStatusDto } from './dto/status.dto';
 import { PaginationDto } from '../utils/pagination.util';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('statuses')
@@ -21,8 +22,10 @@ export class StatusesController {
     @UseInterceptors(FileInterceptor('media'))
     create(
         @Body() createStatusDto: CreateStatusDto,
+        @CurrentUser() user: any,
         @UploadedFile() file?: Express.Multer.File,
     ) {
+        createStatusDto.userId = user.id;
         return this.statusesService.create(createStatusDto, file);
     }
 
@@ -65,8 +68,9 @@ export class StatusesController {
     update(
         @Param('id', ParseIntPipe) id: number,
         @Body() updateStatusDto: UpdateStatusDto,
+        @CurrentUser() user: any,
     ) {
-        return this.statusesService.update(id, updateStatusDto);
+        return this.statusesService.update(id, updateStatusDto, user.id, user.role);
     }
 
     /**
@@ -74,7 +78,10 @@ export class StatusesController {
      * Delete a status by its ID.
      */
     @Delete(':id')
-    remove(@Param('id', ParseIntPipe) id: number) {
-        return this.statusesService.remove(id);
+    remove(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() user: any,
+    ) {
+        return this.statusesService.remove(id, user.id, user.role);
     }
 }

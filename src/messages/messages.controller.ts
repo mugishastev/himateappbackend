@@ -26,8 +26,10 @@ export class MessagesController {
     @ApiResponse({ status: 201, description: 'Message sent successfully' })
     create(
         @Body() createMessageDto: CreateMessageDto,
+        @CurrentUser() user: any,
         @UploadedFile() file?: Express.Multer.File,
     ) {
+        createMessageDto.senderId = user.id;
         return this.messagesService.create(createMessageDto, file);
     }
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { UploadApiErrorResponse, UploadApiResponse } from 'cloudinary';
 import { Readable } from 'stream';
@@ -8,9 +8,16 @@ export class CloudinaryService {
     async uploadImage(
         file: Express.Multer.File,
     ): Promise<UploadApiResponse | UploadApiErrorResponse> {
+        if (!file?.buffer) {
+            throw new BadRequestException('Invalid file upload payload');
+        }
+
         return new Promise((resolve, reject) => {
             const upload = cloudinary.uploader.upload_stream((error, result) => {
-                if (error) return reject(error);
+                if (error) {
+                    const message = (error as any)?.message || 'Cloudinary upload failed';
+                    return reject(new BadGatewayException(message));
+                }
                 if (!result) return reject(new Error('Upload failed: Empty result'));
                 resolve(result);
             });

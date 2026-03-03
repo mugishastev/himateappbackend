@@ -1,8 +1,11 @@
 import { IsString, IsInt, IsOptional, IsDateString } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateStatusDto {
+    @IsOptional()
+    @Type(() => Number)
     @IsInt()
-    userId: number;
+    userId?: number;
 
     @IsString()
     content: string;

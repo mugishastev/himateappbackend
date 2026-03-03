@@ -1,9 +1,6 @@
-import { IsString, IsInt } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class CreateSettingDto {
-    @IsInt()
-    userId: number;
-
     @IsString()
     key: string;
 
@@ -12,6 +9,10 @@ export class CreateSettingDto {
 }
 
 export class UpdateSettingDto {
+    @IsOptional()
+    @IsString()
+    key?: string;
+
     @IsString()
     value: string;
 }
