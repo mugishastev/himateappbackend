@@ -7,9 +7,12 @@ import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
 export class SettingsService {
     constructor(private prisma: PrismaService) { }
 
-    async create(createSettingDto: CreateSettingDto) {
+    async create(userId: number, createSettingDto: CreateSettingDto) {
         return this.prisma.setting.create({
-            data: createSettingDto,
+            data: {
+                ...createSettingDto,
+                userId,
+            },
         });
     }
 

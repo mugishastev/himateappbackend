@@ -4,6 +4,7 @@ import { CreateSettingDto, UpdateSettingDto } from './dto/setting.dto';
 import { PaginationDto } from '../utils/pagination.util';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('settings')
@@ -11,8 +12,8 @@ export class SettingsController {
     constructor(private readonly settingsService: SettingsService) { }
 
     @Post()
-    create(@Body() createSettingDto: CreateSettingDto) {
-        return this.settingsService.create(createSettingDto);
+    create(@CurrentUser() user: any, @Body() createSettingDto: CreateSettingDto) {
+        return this.settingsService.create(user.id, createSettingDto);
     }
 
     @Get('user/:userId')
