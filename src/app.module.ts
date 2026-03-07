@@ -16,6 +16,7 @@ import { CallsModule } from './calls/calls.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SettingsModule } from './settings/settings.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { AdminModule } from './admin/admin.module';
 
 import { UtilsModule } from './utils/utils.module';
 import { AuthModule } from './auth/auth.module';
@@ -52,6 +53,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     NotificationsModule,
     SettingsModule,
     AuditLogsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

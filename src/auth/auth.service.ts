@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
@@ -62,13 +62,16 @@ export class AuthService {
 
         const user = await this.prisma.user.findUnique({
             where: { email },
-            select: { id: true, email: true, username: true, profileImage: true, bio: true }
+            select: { id: true, email: true, username: true, profileImage: true, bio: true, role: true }
         });
         const tokens = await this.generateTokens(user!.id, user!.email);
 
         return {
             message: 'Email verified successfully.',
-            user,
+            user: {
+                ...user,
+                isAdmin: user?.role?.name === 'ADMIN'
+            },
             ...tokens,
         };
     }
@@ -88,14 +91,30 @@ export class AuthService {
 
     async login(loginDto: LoginDto) {
         const { email, password } = loginDto;
+        console.log(`[LOGIN-DEBUG] Attempting login for: ${email}`);
 
-        const user = await this.prisma.user.findUnique({ where: { email } });
+        const user = await this.prisma.user.findUnique({
+            where: { email },
+            include: { role: true }
+        });
+        console.log(`[LOGIN-DEBUG] User found:`, user ? { id: user.id, email: user.email, hasPassword: !!user.password, isVerified: user.isVerified, roleId: user.roleId } : 'No user found');
+
         if (!user || !user.password) throw new UnauthorizedException('Invalid credentials');
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
+        console.log(`[LOGIN-DEBUG] Password valid: ${isPasswordValid}`);
+
         if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials');
 
-        if (!user.isVerified) throw new UnauthorizedException('Please verify your email before logging in');
+        if (!user.isVerified) {
+            console.log(`[LOGIN-DEBUG] User not verified!`);
+            throw new UnauthorizedException('Please verify your email before logging in');
+        }
+
+        if (user.isBanned) {
+            console.log(`[LOGIN-DEBUG] User is banned!`);
+            throw new ForbiddenException(user.banReason || 'You have been suspended from the platform.');
+        }
 
         // Log audit and update lastSeen
         await Promise.all([
@@ -113,7 +132,10 @@ export class AuthService {
 
         return {
             ...tokens,
-            user: userWithoutPassword,
+            user: {
+                ...userWithoutPassword,
+                isAdmin: user.role?.name === 'ADMIN'
+            },
         };
     }
 

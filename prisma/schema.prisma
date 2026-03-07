@@ -10,6 +10,8 @@ model User {
   id            Int                       @id @default(autoincrement())
   email         String                    @unique
   isVerified    Boolean                   @default(false)
+  isBanned      Boolean                   @default(false)
+  banReason     String?
   username      String?
   phoneNumber   String?                   @unique
   password      String? // optional, niba ushaka extra login

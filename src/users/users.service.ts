@@ -21,12 +21,20 @@ export class UsersService {
         const { skip, take } = getPaginationParams(paginationDto);
         const { search } = paginationDto;
 
-        const where = search ? {
+        const searchCondition = search ? {
             OR: [
                 { username: { contains: search, mode: 'insensitive' as const } },
                 { email: { contains: search, mode: 'insensitive' as const } },
             ],
         } : {};
+
+        const where = {
+            ...searchCondition,
+            // Exclude admins from public searches
+            role: {
+                name: { not: 'ADMIN' }
+            }
+        };
 
         const [data, total] = await Promise.all([
             this.prisma.user.findMany({
@@ -88,5 +96,19 @@ export class UsersService {
         return this.prisma.user.delete({
             where: { id },
         });
+    }
+
+    async changePassword(id: number, currentPassword: string, newPassword: string) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const bcrypt = require('bcryptjs');
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user) throw new NotFoundException('User not found');
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) throw new BadRequestException('Current password is incorrect');
+
+        const hashed = await bcrypt.hash(newPassword, 10);
+        await this.prisma.user.update({ where: { id }, data: { password: hashed } });
+        return { message: 'Password updated successfully' };
     }
 }

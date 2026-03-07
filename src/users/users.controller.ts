@@ -67,6 +67,18 @@ export class UsersController {
         return this.usersService.updateFcmToken(id, fcmToken);
     }
 
+    @Patch(':id/change-password')
+    @ApiOperation({ summary: 'Change user password' })
+    @ApiResponse({ status: 200, description: 'Password changed' })
+    @ApiBody({ schema: { properties: { currentPassword: { type: 'string' }, newPassword: { type: 'string' } } } })
+    changePassword(
+        @Param('id', ParseIntPipe) id: number,
+        @Body('currentPassword') currentPassword: string,
+        @Body('newPassword') newPassword: string,
+    ) {
+        return this.usersService.changePassword(id, currentPassword, newPassword);
+    }
+
     @Delete(':id')
     @ApiOperation({ summary: 'Delete user' })
     @ApiResponse({ status: 200, description: 'User deleted' })

@@ -46,6 +46,47 @@ async function main() {
     }
 
     console.log('Seeding completed.');
+
+    // 3. Create Admin User
+    const adminEmail = 'admin@himate.com';
+    const adminPassword = 'AdminPassword123!';
+    const adminUsername = 'HimateAdmin';
+    const bcrypt = require('bcryptjs');
+
+    const adminRoleInDb = await prisma.role.findUnique({ where: { name: 'ADMIN' } });
+    if (!adminRoleInDb) {
+        console.error('ADMIN role not found after seeding!');
+        return;
+    }
+
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+    const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
+    if (existingAdmin) {
+        console.log(`Admin user with email ${adminEmail} already exists. Updating...`);
+        await prisma.user.update({
+            where: { email: adminEmail },
+            data: {
+                password: hashedPassword,
+                isVerified: true,
+                roleId: adminRoleInDb.id
+            }
+        });
+        console.log('Updated existing admin user.');
+    } else {
+        await prisma.user.create({
+            data: {
+                email: adminEmail,
+                password: hashedPassword,
+                username: adminUsername,
+                isVerified: true,
+                roleId: adminRoleInDb.id
+            }
+        });
+        console.log(`Admin user created successfully!`);
+        console.log(`Email: ${adminEmail}`);
+        console.log(`Password: ${adminPassword}`);
+    }
 }
 
 main()
