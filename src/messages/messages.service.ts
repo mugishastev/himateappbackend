@@ -15,9 +15,22 @@ export class MessagesService {
 
     async create(createMessageDto: CreateMessageDto, file?: Express.Multer.File) {
         let mediaUrl: string | null = null;
+        let type = createMessageDto.type || 'TEXT';
+
         if (file) {
             const result = await this.cloudinary.uploadImage(file);
             mediaUrl = result.secure_url;
+
+            // Simple type detection based on mimetype
+            if (file.mimetype.startsWith('image/')) {
+                type = 'IMAGE';
+            } else if (file.mimetype.startsWith('video/')) {
+                type = 'VIDEO';
+            } else if (file.mimetype.startsWith('audio/')) {
+                type = 'AUDIO';
+            } else {
+                type = 'FILE';
+            }
         }
 
         return this.prisma.message.create({
@@ -25,6 +38,7 @@ export class MessagesService {
                 ...createMessageDto,
                 content: createMessageDto.content || '',
                 mediaUrl,
+                type: type as any,
             },
             include: { sender: true },
         });
@@ -81,6 +95,21 @@ export class MessagesService {
         return this.prisma.message.update({
             where: { id },
             data: { isRead: true, isDelivered: true },
+        });
+    }
+
+    // ─── Update ───────────────────────────────────────────────────────────────
+    async update(id: number, content: string, userId: number) {
+        const message = await this.prisma.message.findUnique({ where: { id } });
+        if (!message) throw new NotFoundException(`Message with ID ${id} not found`);
+
+        if (message.senderId !== userId) {
+            throw new UnauthorizedException('You can only edit your own messages');
+        }
+
+        return this.prisma.message.update({
+            where: { id },
+            data: { content },
         });
     }
 

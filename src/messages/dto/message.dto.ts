@@ -18,6 +18,11 @@ export class CreateMessageDto {
     @IsInt()
     conversationId: number;
 
+    @ApiProperty({ example: 'IMAGE', description: 'Message type', required: false })
+    @IsString()
+    @IsOptional()
+    type?: string;
+
     @ApiProperty({ type: 'string', format: 'binary', description: 'Optional media file', required: false })
     @IsOptional()
     media?: any;

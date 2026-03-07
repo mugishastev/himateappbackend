@@ -80,6 +80,7 @@ model ConversationParticipant {
 model Message {
   id             Int          @id @default(autoincrement())
   content        String
+  type           MessageType  @default(TEXT)
   senderId       Int
   conversationId Int
   mediaUrl       String?
@@ -93,6 +94,15 @@ model Message {
 
   @@index([senderId])
   @@index([conversationId])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+  SYSTEM
 }
 
 model Attachment {

@@ -58,6 +58,17 @@ export class MessagesController {
         return this.messagesService.markAsRead(id);
     }
 
+    @Patch(':id')
+    @ApiOperation({ summary: 'Update a message content' })
+    @ApiResponse({ status: 200, description: 'Message updated' })
+    update(
+        @Param('id', ParseIntPipe) id: number,
+        @Body('content') content: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.messagesService.update(id, content, user.id);
+    }
+
     @Delete(':id')
     @ApiOperation({ summary: 'Delete a message' })
     @ApiResponse({ status: 200, description: 'Message deleted (soft delete)' })
