@@ -142,4 +142,20 @@ export class MessagesService {
             },
         });
     }
+
+    // ─── Mark Conversation As Read ────────────────────────────────────────────
+
+    async markConversationAsRead(conversationId: number, userId: number) {
+        const result = await this.prisma.message.updateMany({
+            where: {
+                conversationId,
+                senderId: { not: userId },
+                isRead: false,
+                isDeleted: false,
+            },
+            data: { isRead: true },
+        });
+
+        return { count: result.count };
+    }
 }

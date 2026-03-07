@@ -13,14 +13,17 @@ export class CloudinaryService {
         }
 
         return new Promise((resolve, reject) => {
-            const upload = cloudinary.uploader.upload_stream((error, result) => {
-                if (error) {
-                    const message = (error as any)?.message || 'Cloudinary upload failed';
-                    return reject(new BadGatewayException(message));
+            const upload = cloudinary.uploader.upload_stream(
+                { resource_type: 'auto' },
+                (error, result) => {
+                    if (error) {
+                        const message = (error as any)?.message || 'Cloudinary upload failed';
+                        return reject(new BadGatewayException(message));
+                    }
+                    if (!result) return reject(new Error('Upload failed: Empty result'));
+                    resolve(result);
                 }
-                if (!result) return reject(new Error('Upload failed: Empty result'));
-                resolve(result);
-            });
+            );
 
             const stream = Readable.from(file.buffer);
             stream.pipe(upload);

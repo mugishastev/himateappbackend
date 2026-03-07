@@ -51,6 +51,16 @@ export class MessagesController {
         return this.messagesService.findOne(id);
     }
 
+    @Patch('conversation/:id/read')
+    @ApiOperation({ summary: 'Mark all messages in a conversation as read' })
+    @ApiResponse({ status: 200, description: 'Messages marked as read' })
+    markConversationAsRead(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() user: any,
+    ) {
+        return this.messagesService.markConversationAsRead(id, user.id);
+    }
+
     @Patch(':id/read')
     @ApiOperation({ summary: 'Mark message as read' })
     @ApiResponse({ status: 200, description: 'Message marked as read' })
