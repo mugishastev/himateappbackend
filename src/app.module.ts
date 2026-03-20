@@ -21,6 +21,7 @@ import { AdminModule } from './admin/admin.module';
 import { UtilsModule } from './utils/utils.module';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
+import { PagesModule } from './pages/pages.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
@@ -54,6 +55,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     SettingsModule,
     AuditLogsModule,
     AdminModule,
+    PagesModule,
   ],
   controllers: [AppController],
   providers: [

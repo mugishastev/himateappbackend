@@ -35,6 +35,9 @@ model User {
   auditLogs     AuditLog[]
   blockedUsers  BlockedUser[]             @relation("UserBlocking")
   blockedBy     BlockedUser[]             @relation("UserBlocked")
+  pages         Page[]                    @relation("UserPages")
+  followedPages PageFollower[]            @relation("UserFollowedPages")
+  postReactions PostReaction[]            @relation("UserPostReactions")
   createdAt     DateTime                  @default(now())
 }
 
@@ -196,3 +199,59 @@ model AuditLog {
   createdAt DateTime @default(now())
   user      User?    @relation(fields: [userId], references: [id])
 }
+
+// ─── PAGES FEATURE ────────────────────────────────────────────────────────
+
+model Page {
+  id            Int       @id @default(autoincrement())
+  ownerId       Int
+  name          String    @unique
+  handle        String    @unique
+  bio           String?
+  avatarUrl     String?
+  coverPhotoUrl String?
+  isVerified    Boolean   @default(false)
+  category      String
+  
+  owner         User      @relation("UserPages", fields: [ownerId], references: [id])
+  followers     PageFollower[]
+  posts         PagePost[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model PageFollower {
+  pageId        Int
+  userId        Int
+  notifications Boolean   @default(true)
+  
+  page          Page      @relation(fields: [pageId], references: [id])
+  user          User      @relation("UserFollowedPages", fields: [userId], references: [id])
+  
+  @@id([pageId, userId])
+}
+
+model PagePost {
+  id        Int       @id @default(autoincrement())
+  pageId    Int
+  content   String
+  mediaUrls String[]
+  views     Int       @default(0)
+  
+  page      Page      @relation(fields: [pageId], references: [id])
+  reactions PostReaction[]
+  
+  createdAt DateTime  @default(now())
+}
+
+model PostReaction {
+  id        Int       @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  emoji     String
+  
+  post      PagePost  @relation(fields: [postId], references: [id])
+  user      User      @relation("UserPostReactions", fields: [userId], references: [id])
+}
+
