@@ -54,4 +54,24 @@ export class FcmService implements OnModuleInit {
             console.error('Error sending topic notification:', error);
         }
     }
+
+    async subscribeToTopic(tokens: string[], topic: string) {
+        if (!tokens || tokens.length === 0) return;
+        try {
+            await admin.messaging().subscribeToTopic(tokens, topic);
+            console.log(`Successfully subscribed ${tokens.length} tokens to topic: ${topic}`);
+        } catch (error) {
+            console.error('Error subscribing to topic:', error);
+        }
+    }
+
+    async unsubscribeFromTopic(tokens: string[], topic: string) {
+        if (!tokens || tokens.length === 0) return;
+        try {
+            await admin.messaging().unsubscribeFromTopic(tokens, topic);
+            console.log(`Successfully unsubscribed ${tokens.length} tokens from topic: ${topic}`);
+        } catch (error) {
+            console.error('Error unsubscribing from topic:', error);
+        }
+    }
 }
