@@ -24,7 +24,7 @@ export class TransformInterceptor<T>
             map((data) => ({
                 success: true,
                 message: data?.message || 'Request successful',
-                data: data?.data || data,
+                data: data,
             })),
         );
     }

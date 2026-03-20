@@ -1,16 +1,18 @@
-import { Injectable, BadRequestException, NotFoundException, Inject, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto, CreatePagePostDto } from './dto/page.dto';
 import { Redis } from 'ioredis';
 import { FcmService } from '../notifications/fcm.service';
+import { CloudinaryService } from '../utils/cloudinary.service';
 
 @Injectable()
 export class PagesService {
     private redisClient: Redis;
 
     constructor(
-        private prisma: PrismaService,
-        private fcmService: FcmService
+        private readonly prisma: PrismaService,
+        private readonly fcmService: FcmService,
+        private readonly cloudinary: CloudinaryService
     ) {
         // We initialize a Redis Pub/Sub client here for mass broadcasting functionality
         this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -187,6 +189,12 @@ export class PagesService {
         // Delete reactions first
         await this.prisma.postReaction.deleteMany({ where: { postId } });
         return this.prisma.pagePost.delete({ where: { id: postId } });
+    }
+
+    async uploadMedia(file: any) {
+        if (!file) throw new BadRequestException('File is required');
+        const result = await this.cloudinary.uploadImage(file);
+        return { url: result.secure_url };
     }
 
     async incrementPostViews(postId: number) {
