@@ -16,14 +16,13 @@ export class AdminController {
         return this.adminService.getStats();
     }
 
-    @Get('users')
-    @ApiOperation({ summary: 'Get all users (admin view)' })
     getAllUsers(
         @Query('page') page = '1',
         @Query('limit') limit = '20',
         @Query('search') search?: string,
+        @Query('isBanned') isBanned?: string,
     ) {
-        return this.adminService.getAllUsers(+page, +limit, search);
+        return this.adminService.getAllUsers(+page, +limit, search, isBanned === 'true');
     }
 
     @Get('conversations')

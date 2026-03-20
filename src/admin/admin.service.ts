@@ -87,11 +87,15 @@ export class AdminService {
         };
     }
 
-    async getAllUsers(page = 1, limit = 20, search?: string) {
+    async getAllUsers(page = 1, limit = 20, search?: string, isBanned?: boolean) {
         const skip = (page - 1) * limit;
-        const where = search
-            ? { OR: [{ username: { contains: search, mode: 'insensitive' as const } }, { email: { contains: search, mode: 'insensitive' as const } }] }
-            : {};
+        const where: any = {};
+        if (search) {
+            where.OR = [{ username: { contains: search, mode: 'insensitive' as const } }, { email: { contains: search, mode: 'insensitive' as const } }];
+        }
+        if (isBanned !== undefined) {
+            where.isBanned = isBanned;
+        }
 
         const [data, total] = await Promise.all([
             this.prisma.user.findMany({
