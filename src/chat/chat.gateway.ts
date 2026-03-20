@@ -233,9 +233,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         });
     }
 
-    /**
-     * Notifies a specific user about an incoming call.
-     */
     @SubscribeMessage('initiateCall')
     handleInitiateCall(
         @MessageBody() data: { receiverId: number; type: 'AUDIO' | 'VIDEO'; conversationId: number },
@@ -246,6 +243,32 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
             callerId: senderId,
             type: data.type,
             conversationId: data.conversationId,
+        });
+    }
+
+    /**
+     * Broadcasts when a user accepts an incoming call.
+     */
+    @SubscribeMessage('acceptCall')
+    handleAcceptCall(
+        @MessageBody() data: { callerId: number },
+        @ConnectedSocket() client: Socket,
+    ) {
+        this.server.to(`user_${data.callerId}`).emit('callAccepted', {
+            receiverId: client.data.userId,
+        });
+    }
+
+    /**
+     * Broadcasts when a user ends or rejects a call.
+     */
+    @SubscribeMessage('endCall')
+    handleEndCall(
+        @MessageBody() data: { targetId: number },
+        @ConnectedSocket() client: Socket,
+    ) {
+        this.server.to(`user_${data.targetId}`).emit('callEnded', {
+            userId: client.data.userId,
         });
     }
 

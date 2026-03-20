@@ -13,6 +13,17 @@ export class CallsService {
         });
     }
 
+    async scheduleCall(data: any) {
+        return this.prisma.scheduledCall.create({
+            data: {
+                callerId: data.callerId,
+                receiverId: data.receiverId,
+                scheduledAt: new Date(data.scheduledAt),
+                type: data.type || 'AUDIO',
+            }
+        });
+    }
+
     async findAll(paginationDto: PaginationDto) {
         const { skip, take } = getPaginationParams(paginationDto);
         const [data, total] = await Promise.all([

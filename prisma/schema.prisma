@@ -26,8 +26,10 @@ model User {
   conversations ConversationParticipant[]
   messages      Message[]                 @relation("UserMessages")
   statuses      Status[]
-  calls         Call[]                    @relation("UserCalls")
-  receivedCalls Call[]                    @relation("UserReceivedCalls")
+  calls             Call[]                    @relation("UserCalls")
+  receivedCalls     Call[]                    @relation("UserReceivedCalls")
+  scheduledCalls    ScheduledCall[]           @relation("ScheduledCaller")
+  scheduledReceived ScheduledCall[]           @relation("ScheduledReceiver")
   notifications Notification[]
   settings      Setting[]
   auditLogs     AuditLog[]
@@ -149,6 +151,18 @@ model Call {
   type       CallType
   caller     User      @relation("UserCalls", fields: [callerId], references: [id])
   receiver   User      @relation("UserReceivedCalls", fields: [receiverId], references: [id])
+}
+
+model ScheduledCall {
+  id          Int      @id @default(autoincrement())
+  callerId    Int
+  receiverId  Int
+  scheduledAt DateTime
+  type        CallType @default(AUDIO)
+  createdAt   DateTime @default(now())
+
+  caller      User     @relation("ScheduledCaller", fields: [callerId], references: [id])
+  receiver    User     @relation("ScheduledReceiver", fields: [receiverId], references: [id])
 }
 
 enum CallType {

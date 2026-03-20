@@ -89,21 +89,28 @@ export class ConversationsService {
             this.prisma.conversation.count({ where }),
         ]);
 
-        const data = await Promise.all(
-            rawConversations.map(async (conv) => {
-                const unreadCount = await this.prisma.message.count({
-                    where: {
-                        conversationId: conv.id,
-                        senderId: { not: userId },
-                        isRead: false,
-                        isDeleted: false,
-                    },
-                });
-                // Expose the latest message as a top-level field
-                const lastMessage = conv.messages[0] ?? null;
-                return { ...conv, unreadCount, lastMessage };
-            }),
-        );
+        // Get unread counts for all these conversations in one query (avoid N+1)
+        const unreadCounts = await this.prisma.message.groupBy({
+            by: ['conversationId'],
+            where: {
+                conversationId: { in: rawConversations.map(c => c.id) },
+                senderId: { not: userId },
+                isRead: false,
+                isDeleted: false,
+            },
+            _count: { id: true },
+        });
+
+        const data = rawConversations.map((conv) => {
+            const countObj = unreadCounts.find((c) => c.conversationId === conv.id);
+            const unreadCount = countObj?._count.id || 0;
+            const lastMessage = conv.messages[0] ?? null;
+            return {
+                ...conv,
+                unreadCount,
+                lastMessage,
+            };
+        });
 
         // Re-sort by latest message timestamp
         data.sort((a, b) => {

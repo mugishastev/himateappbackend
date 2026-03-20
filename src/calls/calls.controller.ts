@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { CallsService } from './calls.service';
-import { CreateCallDto, UpdateCallDto } from './dto/call.dto';
+import { CreateCallDto, UpdateCallDto, ScheduleCallDto } from './dto/call.dto';
 import { PaginationDto } from '../utils/pagination.util';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -13,6 +13,11 @@ export class CallsController {
     @Post()
     create(@Body() createCallDto: CreateCallDto) {
         return this.callsService.create(createCallDto);
+    }
+
+    @Post('schedule')
+    schedule(@Body() scheduleCallDto: ScheduleCallDto) {
+        return this.callsService.scheduleCall(scheduleCallDto);
     }
 
     @Get()

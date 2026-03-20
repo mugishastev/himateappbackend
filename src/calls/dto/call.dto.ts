@@ -24,3 +24,18 @@ export class UpdateCallDto {
     @IsDateString()
     endedAt?: string;
 }
+
+export class ScheduleCallDto {
+    @IsInt()
+    callerId: number;
+
+    @IsInt()
+    receiverId: number;
+
+    @IsDateString()
+    scheduledAt: string;
+
+    @IsEnum(CallType)
+    @IsOptional()
+    type?: CallType;
+}
