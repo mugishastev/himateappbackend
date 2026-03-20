@@ -58,13 +58,32 @@ export class ConversationsService {
                 skip,
                 take,
                 include: {
-                    participants: { include: { user: true } },
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    profileImage: true,
+                                    email: true,
+                                    lastSeen: true,
+                                    bio: true,
+                                },
+                            },
+                        },
+                    },
                     messages: {
                         where: { isDeleted: false },
                         take: 1,
                         orderBy: { timestamp: 'desc' },
+                        include: {
+                            sender: {
+                                select: { id: true, username: true },
+                            },
+                        },
                     },
                 },
+                // Sort by latest message timestamp, falling back to conversation creation
                 orderBy: { createdAt: 'desc' },
             }),
             this.prisma.conversation.count({ where }),
@@ -80,9 +99,18 @@ export class ConversationsService {
                         isDeleted: false,
                     },
                 });
-                return { ...conv, unreadCount };
+                // Expose the latest message as a top-level field
+                const lastMessage = conv.messages[0] ?? null;
+                return { ...conv, unreadCount, lastMessage };
             }),
         );
+
+        // Re-sort by latest message timestamp
+        data.sort((a, b) => {
+            const aTime = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : new Date(a.createdAt).getTime();
+            const bTime = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : new Date(b.createdAt).getTime();
+            return bTime - aTime;
+        });
 
         return { data, total, page: paginationDto.page, limit: paginationDto.limit };
     }
