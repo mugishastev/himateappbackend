@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, ParseIntPipe, Query, Patch } from '@nestjs/common';
 import { PagesService } from './pages.service';
 import { CreatePageDto, CreatePagePostDto } from './dto/page.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -15,8 +15,24 @@ export class PagesController {
     }
 
     @Get('discover')
-    getDiscoverPages() {
-        return this.pagesService.getDiscoverPages();
+    getDiscoverPages(@Query('search') search?: string) {
+        return this.pagesService.getDiscoverPages(search);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get('my-pages')
+    getMyPages(@CurrentUser() user: any) {
+        return this.pagesService.getMyPages(user.id);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Patch(':id')
+    updatePage(
+        @CurrentUser() user: any,
+        @Param('id', ParseIntPipe) pageId: number,
+        @Body() dto: Partial<CreatePageDto>
+    ) {
+        return this.pagesService.updatePage(user.id, pageId, dto);
     }
 
     @Get(':handle')
@@ -40,11 +56,7 @@ export class PagesController {
         return this.pagesService.createPost(user.id, pageId, createPagePostDto);
     }
 
-    @UseGuards(JwtAuthGuard)
-    @Get('my-pages')
-    getMyPages(@CurrentUser() user: any) {
-        return this.pagesService.getMyPages(user.id);
-    }
+
 
     @UseGuards(JwtAuthGuard)
     @Get(':id/analytics')

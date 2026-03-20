@@ -33,8 +33,34 @@ export class PagesService {
         });
     }
 
-    async getDiscoverPages() {
+    async updatePage(userId: number, pageId: number, updateDto: Partial<CreatePageDto>) {
+        const page = await this.prisma.page.findUnique({ where: { id: pageId } });
+        if (!page) throw new NotFoundException('Page not found');
+        if (page.ownerId !== userId) {
+            throw new UnauthorizedException('You do not own this page.');
+        }
+
+        // Handle uniqueness if changing handle
+        if (updateDto.handle && updateDto.handle !== page.handle) {
+            const existing = await this.prisma.page.findUnique({ where: { handle: updateDto.handle } });
+            if (existing) throw new BadRequestException('Handle already taken');
+        }
+
+        return this.prisma.page.update({
+            where: { id: pageId },
+            data: updateDto,
+        });
+    }
+
+    async getDiscoverPages(search?: string) {
         return this.prisma.page.findMany({
+            where: search ? {
+                OR: [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { handle: { contains: search, mode: 'insensitive' } },
+                    { bio: { contains: search, mode: 'insensitive' } },
+                ]
+            } : {},
             take: 20,
             orderBy: { followers: { _count: 'desc' } },
             include: {
