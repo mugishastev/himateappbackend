@@ -39,4 +39,49 @@ export class PagesController {
     ) {
         return this.pagesService.createPost(user.id, pageId, createPagePostDto);
     }
+
+    @UseGuards(JwtAuthGuard)
+    @Get('my-pages')
+    getMyPages(@CurrentUser() user: any) {
+        return this.pagesService.getMyPages(user.id);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get(':id/analytics')
+    getPageAnalytics(@CurrentUser() user: any, @Param('id', ParseIntPipe) pageId: number) {
+        return this.pagesService.getPageAnalytics(user.id, pageId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get(':id/conversations')
+    getPageConversations(@CurrentUser() user: any, @Param('id', ParseIntPipe) pageId: number) {
+        return this.pagesService.getPageConversations(user.id, pageId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post(':id/message')
+    messagePage(@CurrentUser() user: any, @Param('id', ParseIntPipe) pageId: number) {
+        return this.pagesService.messagePage(user.id, pageId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('posts/:id/react')
+    reactToPost(
+        @CurrentUser() user: any,
+        @Param('id', ParseIntPipe) postId: number,
+        @Body('type') type: string
+    ) {
+        return this.pagesService.toggleReaction(user.id, postId, type || 'LIKE');
+    }
+
+    @Post('posts/:id/view')
+    trackPostView(@Param('id', ParseIntPipe) postId: number) {
+        return this.pagesService.incrementPostViews(postId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('posts/:id/delete')
+    deletePost(@CurrentUser() user: any, @Param('id', ParseIntPipe) postId: number) {
+        return this.pagesService.deletePost(user.id, postId);
+    }
 }

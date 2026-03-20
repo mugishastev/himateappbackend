@@ -81,6 +81,8 @@ model Conversation {
   id           Int                       @id @default(autoincrement())
   title        String?
   isGroup      Boolean                   @default(false)
+  pageId       Int?                      // Link to a Page for support tickets
+  page         Page?                     @relation("PageConversations", fields: [pageId], references: [id])
   participants ConversationParticipant[]
   messages     Message[]
   createdAt    DateTime                  @default(now())
@@ -216,6 +218,7 @@ model Page {
   owner         User      @relation("UserPages", fields: [ownerId], references: [id])
   followers     PageFollower[]
   posts         PagePost[]
+  conversations Conversation[] @relation("PageConversations")
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

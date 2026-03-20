@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Inject, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto, CreatePagePostDto } from './dto/page.dto';
 import { Redis } from 'ioredis';
@@ -51,6 +51,9 @@ export class PagesService {
                 posts: {
                     orderBy: { createdAt: 'desc' },
                     take: 10,
+                    include: {
+                        _count: { select: { reactions: true } }
+                    }
                 },
             },
         });
@@ -119,5 +122,138 @@ export class PagesService {
         }
 
         return newPost;
+    }
+
+    async toggleReaction(userId: number, postId: number, emoji: string) {
+        const existing = await this.prisma.postReaction.findFirst({
+            where: { postId, userId }
+        });
+
+        if (existing) {
+            if (existing.emoji === emoji) {
+                // Remove if same emoji (unlike)
+                return this.prisma.postReaction.delete({ where: { id: existing.id } });
+            } else {
+                // Update emoji
+                return this.prisma.postReaction.update({
+                    where: { id: existing.id },
+                    data: { emoji }
+                });
+            }
+        }
+
+        return this.prisma.postReaction.create({
+            data: { userId, postId, emoji }
+        });
+    }
+
+    async deletePost(userId: number, postId: number) {
+        const post = await this.prisma.pagePost.findUnique({
+            where: { id: postId },
+            include: { page: true }
+        });
+
+        if (!post) throw new NotFoundException('Post not found');
+        if (post.page.ownerId !== userId) {
+            throw new UnauthorizedException('You do not own the page that published this post.');
+        }
+
+        // Delete reactions first
+        await this.prisma.postReaction.deleteMany({ where: { postId } });
+        return this.prisma.pagePost.delete({ where: { id: postId } });
+    }
+
+    async incrementPostViews(postId: number) {
+        return this.prisma.pagePost.update({
+            where: { id: postId },
+            data: { views: { increment: 1 } }
+        });
+    }
+
+    async getMyPages(ownerId: number) {
+        return this.prisma.page.findMany({
+            where: { ownerId },
+            include: {
+                _count: {
+                    select: { followers: true, posts: true }
+                }
+            }
+        });
+    }
+
+    async getPageAnalytics(userId: number, pageId: number) {
+        const page = await this.prisma.page.findUnique({
+            where: { id: pageId },
+        });
+        if (!page || page.ownerId !== userId) {
+            throw new UnauthorizedException('Access denied to page analytics');
+        }
+
+        const followersCount = await this.prisma.pageFollower.count({ where: { pageId } });
+        const postsCount = await this.prisma.pagePost.count({ where: { pageId } });
+        
+        // Summing up views from all posts
+        const posts = await this.prisma.pagePost.findMany({ where: { pageId }, select: { views: true } });
+        const totalViews = posts.reduce((sum, p) => sum + p.views, 0);
+
+        return {
+            followersCount,
+            postsCount,
+            totalViews,
+            unreadTickets: 0 // In a real app, query unread messages/conversations
+        };
+    }
+
+    async getPageConversations(userId: number, pageId: number) {
+        const page = await this.prisma.page.findUnique({ where: { id: pageId } });
+        if (!page || page.ownerId !== userId) {
+            throw new UnauthorizedException('Access denied to page inbox');
+        }
+
+        return this.prisma.conversation.findMany({
+            where: { pageId },
+            include: {
+                participants: { include: { user: true } },
+                messages: {
+                    orderBy: { timestamp: 'desc' },
+                    take: 1
+                }
+            }
+        });
+    }
+
+    async messagePage(userId: number, pageId: number) {
+        const page = await this.prisma.page.findUnique({ where: { id: pageId } });
+        if (!page) throw new NotFoundException('Page not found');
+
+        // Check if a support conversation already exists between this user and this page
+        let conversation = await this.prisma.conversation.findFirst({
+            where: {
+                pageId: pageId,
+                participants: { some: { userId: userId } }
+            },
+            include: { participants: true }
+        });
+
+        if (!conversation) {
+            // Create a new support ticket conversation
+            conversation = await this.prisma.conversation.create({
+                data: {
+                    pageId: pageId,
+                    isGroup: false,
+                    participants: {
+                        createMany: {
+                            data: [
+                                { userId: userId },
+                                { userId: page.ownerId } // Add the page owner as a participant
+                            ]
+                        }
+                    }
+                },
+                include: { participants: true }
+            });
+        }
+
+        return conversation;
     }
 }
