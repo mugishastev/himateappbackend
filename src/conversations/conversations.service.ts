@@ -153,13 +153,13 @@ export class ConversationsService {
     // ─── Delete ───────────────────────────────────────────────────────────────
 
     async remove(id: number) {
-        return this.prisma.conversation.update({
-            where: { id },
-            data: {
-                participants: {
-                    deleteMany: {},
-                },
-            }
-        }).then(() => this.prisma.conversation.delete({ where: { id } }));
+        return this.prisma.$transaction([
+            // 1. Delete all messages in the conversation first
+            this.prisma.message.deleteMany({ where: { conversationId: id } }),
+            // 2. Delete all participants
+            this.prisma.conversationParticipant.deleteMany({ where: { conversationId: id } }),
+            // 3. Finally delete the conversation itself
+            this.prisma.conversation.delete({ where: { id } }),
+        ]);
     }
 }

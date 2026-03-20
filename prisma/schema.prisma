@@ -31,7 +31,22 @@ model User {
   notifications Notification[]
   settings      Setting[]
   auditLogs     AuditLog[]
+  blockedUsers  BlockedUser[]             @relation("UserBlocking")
+  blockedBy     BlockedUser[]             @relation("UserBlocked")
   createdAt     DateTime                  @default(now())
+}
+
+model BlockedUser {
+  id          Int      @id @default(autoincrement())
+  blockerId   Int
+  blockedId   Int
+  blocker     User     @relation("UserBlocking", fields: [blockerId], references: [id])
+  blocked     User     @relation("UserBlocked", fields: [blockedId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
 }
 
 model Role {

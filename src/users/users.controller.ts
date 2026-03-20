@@ -4,8 +4,8 @@ import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { PaginationDto } from '../utils/pagination.util';
 import { FileInterceptor } from '@nestjs/platform-express';
-
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -77,6 +77,33 @@ export class UsersController {
         @Body('newPassword') newPassword: string,
     ) {
         return this.usersService.changePassword(id, currentPassword, newPassword);
+    }
+
+    @Post(':id/block')
+    @ApiOperation({ summary: 'Block a user' })
+    @ApiResponse({ status: 200, description: 'User blocked' })
+    blockUser(
+        @CurrentUser() currentUser: any,
+        @Param('id', ParseIntPipe) targetId: number,
+    ) {
+        return this.usersService.blockUser(currentUser.id, targetId);
+    }
+
+    @Delete(':id/block')
+    @ApiOperation({ summary: 'Unblock a user' })
+    @ApiResponse({ status: 200, description: 'User unblocked' })
+    unblockUser(
+        @CurrentUser() currentUser: any,
+        @Param('id', ParseIntPipe) targetId: number,
+    ) {
+        return this.usersService.unblockUser(currentUser.id, targetId);
+    }
+
+    @Get('me/blocked')
+    @ApiOperation({ summary: 'Get blocked users list' })
+    @ApiResponse({ status: 200, description: 'List of blocked users' })
+    getBlockedUsers(@CurrentUser() currentUser: any) {
+        return this.usersService.getBlockedUsers(currentUser.id);
     }
 
     @Delete(':id')

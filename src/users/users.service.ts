@@ -111,4 +111,36 @@ export class UsersService {
         await this.prisma.user.update({ where: { id }, data: { password: hashed } });
         return { message: 'Password updated successfully' };
     }
+
+    async blockUser(blockerId: number, blockedId: number) {
+        if (blockerId === blockedId) {
+            throw new BadRequestException('You cannot block yourself');
+        }
+        // Upsert to avoid duplicates
+        await this.prisma.blockedUser.upsert({
+            where: { blockerId_blockedId: { blockerId, blockedId } },
+            create: { blockerId, blockedId },
+            update: {},
+        });
+        return { message: 'User blocked successfully' };
+    }
+
+    async unblockUser(blockerId: number, blockedId: number) {
+        await this.prisma.blockedUser.deleteMany({
+            where: { blockerId, blockedId },
+        });
+        return { message: 'User unblocked successfully' };
+    }
+
+    async getBlockedUsers(userId: number) {
+        const blocked = await this.prisma.blockedUser.findMany({
+            where: { blockerId: userId },
+            include: {
+                blocked: {
+                    select: { id: true, username: true, profileImage: true },
+                },
+            },
+        });
+        return blocked.map(b => b.blocked);
+    }
 }
