@@ -18,11 +18,14 @@ export class StatusesService {
             mediaUrl = result.secure_url;
         }
 
+        // Force exactly 24 hours expiration 
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
         return this.prisma.status.create({
             data: {
                 content: createStatusDto.content,
-                expiresAt: createStatusDto.expiresAt,
                 mediaUrl,
+                expiresAt,
                 user: {
                     connect: { id: createStatusDto.userId! },
                 },
@@ -34,12 +37,13 @@ export class StatusesService {
         const { skip, take } = getPaginationParams(paginationDto);
         const [data, total] = await Promise.all([
             this.prisma.status.findMany({
+                where: { expiresAt: { gt: new Date() } },
                 skip,
                 take,
                 include: { user: true },
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prisma.status.count(),
+            this.prisma.status.count({ where: { expiresAt: { gt: new Date() } } }),
         ]);
 
         return {
@@ -54,13 +58,13 @@ export class StatusesService {
         const { skip, take } = getPaginationParams(paginationDto);
         const [data, total] = await Promise.all([
             this.prisma.status.findMany({
-                where: { userId },
+                where: { userId, expiresAt: { gt: new Date() } },
                 skip,
                 take,
                 include: { user: true },
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prisma.status.count({ where: { userId } }),
+            this.prisma.status.count({ where: { userId, expiresAt: { gt: new Date() } } }),
         ]);
 
         return {
