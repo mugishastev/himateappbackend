@@ -16,6 +16,8 @@ export class AdminController {
         return this.adminService.getStats();
     }
 
+    @Get('users')
+    @ApiOperation({ summary: 'Get all users (admin view)' })
     getAllUsers(
         @Query('page') page = '1',
         @Query('limit') limit = '20',
