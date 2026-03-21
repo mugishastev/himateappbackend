@@ -2,18 +2,21 @@ import { Injectable, UnauthorizedException, ConflictException, NotFoundException
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
+import { Redis } from 'ioredis';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from '../utils/mail.service';
 
 @Injectable()
 export class AuthService {
-    private otpMap = new Map<string, { otp: string; expiresAt: Date; purpose: string }>();
+    private redisClient: Redis;
 
     constructor(
         private prisma: PrismaService,
         private jwtService: JwtService,
         private mailService: MailService,
-    ) { }
+    ) {
+        this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+    }
 
     // ─── Register ────────────────────────────────────────────────────────────
 
@@ -251,21 +254,25 @@ export class AuthService {
     private async sendOtp(email: string, purpose: string) {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-        this.otpMap.set(`${email}:${purpose}`, { otp, expiresAt, purpose });
+        const key = `otp:${email}:${purpose}`;
+        
+        await this.redisClient.set(key, JSON.stringify({ otp, expiresAt }), 'EX', 600);
         await this.mailService.sendOtpEmail(email, otp);
     }
 
-    private validateOtp(email: string, otp: string, purpose: string) {
-        const key = `${email}:${purpose}`;
-        const stored = this.otpMap.get(key);
+    private async validateOtp(email: string, otp: string, purpose: string) {
+        const key = `otp:${email}:${purpose}`;
+        const storedJson = await this.redisClient.get(key);
 
-        if (!stored) throw new UnauthorizedException('Invalid or expired OTP');
+        if (!storedJson) throw new UnauthorizedException('Invalid or expired OTP');
+        
+        const stored = JSON.parse(storedJson);
         if (stored.otp !== otp) throw new UnauthorizedException('Invalid OTP');
-        if (new Date() > stored.expiresAt) {
-            this.otpMap.delete(key);
+        if (new Date() > new Date(stored.expiresAt)) {
+            await this.redisClient.del(key);
             throw new UnauthorizedException('OTP has expired');
         }
 
-        this.otpMap.delete(key);
+        await this.redisClient.del(key);
     }
 }
