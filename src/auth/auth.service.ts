@@ -16,6 +16,7 @@ export class AuthService {
         private mailService: MailService,
     ) {
         this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+        this.redisClient.on('error', (err) => console.error('[AuthService] Redis error:', err));
     }
 
     // ─── Register ────────────────────────────────────────────────────────────
@@ -24,8 +25,19 @@ export class AuthService {
         const { email, password, username, phoneNumber } = registerDto;
 
         const existingUser = await this.prisma.user.findUnique({ where: { email } });
+        
         if (existingUser) {
-            throw new ConflictException('Email already exists');
+            if (existingUser.isVerified) {
+                throw new ConflictException('Email already exists');
+            } else {
+                // User started registration but didn't verify. Resend OTP.
+                await this.sendOtp(email, 'VERIFY_EMAIL');
+                return {
+                    message: 'Already registered but not verified. A new verification code has been sent to your email.',
+                    userId: existingUser.id,
+                    email: existingUser.email,
+                };
+            }
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -47,7 +59,18 @@ export class AuthService {
         });
 
         // Generate + send verification OTP
-        await this.sendOtp(email, 'VERIFY_EMAIL');
+        try {
+            await this.sendOtp(email, 'VERIFY_EMAIL');
+        } catch (error) {
+            console.error('Registration OTP failed:', error);
+            // We still return success since user is created, but with a warning.
+            return {
+                message: 'Registration successful, but we failed to send your verification email. Please use the "Resend OTP" option.',
+                userId: user.id,
+                email: user.email,
+                warning: 'Email delivery failed'
+            };
+        }
 
         return {
             message: 'Registration successful. Please check your email for the verification code.',
