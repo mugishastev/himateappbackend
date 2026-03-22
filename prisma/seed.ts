@@ -1,11 +1,38 @@
-import { PrismaClient } from '@prisma/client';
-import * as dotenv from 'dotenv';
+const path = require('path');
+const dotenv = require('dotenv');
 
-dotenv.config();
+// Load environment variables with absolute path
+const envPath = path.resolve(__dirname, '../.env');
+const result = dotenv.config({ path: envPath });
+
+console.log('>>> DEBUG: SEED SCRIPT STARTING');
+console.log('>>> DEBUG: ENV PATH:', envPath);
+if (result.error) {
+    console.error('>>> DEBUG: DOTENV ERROR:', result.error);
+} else {
+    console.log('>>> DEBUG: DOTENV SUCCESS');
+}
+console.log('>>> DEBUG: DB URL LENGTH:', process.env.DATABASE_URL?.length || 0);
+
+import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
+
+console.log('>>> DEBUG: IMPORTS COMPLETED');
 
 const prisma = new PrismaClient();
 
 async function main() {
+    console.log('>>> DEBUG: MAIN FUNCTION START');
+    
+    // Explicitly check connection
+    try {
+        await prisma.$connect();
+        console.log('>>> DEBUG: PRISMA CONNECTED');
+    } catch (e) {
+        console.error('>>> DEBUG: PRISMA CONNECTION FAILED');
+        throw e;
+    }
+
     console.log('Seeding roles and permissions...');
 
     // 1. Create Roles
@@ -45,21 +72,21 @@ async function main() {
         }
     }
 
-    console.log('Seeding completed.');
+    console.log('Roles and permissions seeded.');
 
     // 3. Create Admin User
     const adminEmail = 'admin@himate.com';
     const adminPassword = 'AdminPassword123!';
     const adminUsername = 'HimateAdmin';
-    const bcrypt = require('bcryptjs');
 
     const adminRoleInDb = await prisma.role.findUnique({ where: { name: 'ADMIN' } });
     if (!adminRoleInDb) {
-        console.error('ADMIN role not found after seeding!');
-        return;
+        throw new Error('ADMIN role not found after seeding!');
     }
 
+    console.log('Hashing password...');
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    console.log('Password hashed.');
 
     const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
     if (existingAdmin) {
@@ -84,13 +111,14 @@ async function main() {
             }
         });
         console.log(`Admin user created successfully!`);
-        console.log(`Email: ${adminEmail}`);
-        console.log(`Password: ${adminPassword}`);
     }
+
+    console.log('Seeding completed.');
 }
 
 main()
     .catch((e) => {
+        console.error('An error occurred while seeding:');
         console.error(e);
         process.exit(1);
     })

@@ -7,47 +7,47 @@ datasource db {
 }
 
 model User {
-  id            Int                       @id @default(autoincrement())
-  email         String                    @unique
-  isVerified    Boolean                   @default(false)
-  isBanned      Boolean                   @default(false)
-  banReason     String?
-  username      String?
-  phoneNumber   String?                   @unique
-  password      String? // optional, niba ushaka extra login
-  profileImage  String?
-  bio           String?
-  fcmToken      String? // For mobile push notifications
-  lastSeen      DateTime?                 @default(now())
-  roleId        Int?
-  role          Role?                     @relation(fields: [roleId], references: [id])
-  contacts      Contact[]                 @relation("UserContacts")
-  contactOf     Contact[]                 @relation("UserContactOf")
-  conversations ConversationParticipant[]
-  messages      Message[]                 @relation("UserMessages")
-  statuses      Status[]
+  id                Int                       @id @default(autoincrement())
+  email             String                    @unique
+  isVerified        Boolean                   @default(false)
+  username          String?
+  phoneNumber       String?                   @unique
+  password          String?
+  profileImage      String?
+  fcmToken          String?
+  lastSeen          DateTime?                 @default(now())
+  roleId            Int?
+  createdAt         DateTime                  @default(now())
+  bio               String?
+  banReason         String?
+  isBanned          Boolean                   @default(false)
+  auditLogs         AuditLog[]
+  blockedBy         BlockedUser[]             @relation("UserBlocked")
+  blockedUsers      BlockedUser[]             @relation("UserBlocking")
   calls             Call[]                    @relation("UserCalls")
   receivedCalls     Call[]                    @relation("UserReceivedCalls")
+  contactOf         Contact[]                 @relation("UserContactOf")
+  contacts          Contact[]                 @relation("UserContacts")
+  conversations     ConversationParticipant[]
+  messages          Message[]                 @relation("UserMessages")
+  notifications     Notification[]
+  pages             Page[]                    @relation("UserPages")
+  followedPages     PageFollower[]            @relation("UserFollowedPages")
+  postReactions     PostReaction[]            @relation("UserPostReactions")
   scheduledCalls    ScheduledCall[]           @relation("ScheduledCaller")
   scheduledReceived ScheduledCall[]           @relation("ScheduledReceiver")
-  notifications Notification[]
-  settings      Setting[]
-  auditLogs     AuditLog[]
-  blockedUsers  BlockedUser[]             @relation("UserBlocking")
-  blockedBy     BlockedUser[]             @relation("UserBlocked")
-  pages         Page[]                    @relation("UserPages")
-  followedPages PageFollower[]            @relation("UserFollowedPages")
-  postReactions PostReaction[]            @relation("UserPostReactions")
-  createdAt     DateTime                  @default(now())
+  settings          Setting[]
+  statuses          Status[]
+  role              Role?                     @relation(fields: [roleId], references: [id])
 }
 
 model BlockedUser {
-  id          Int      @id @default(autoincrement())
-  blockerId   Int
-  blockedId   Int
-  blocker     User     @relation("UserBlocking", fields: [blockerId], references: [id])
-  blocked     User     @relation("UserBlocked", fields: [blockedId], references: [id])
-  createdAt   DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  blockerId Int
+  blockedId Int
+  createdAt DateTime @default(now())
+  blocked   User     @relation("UserBlocked", fields: [blockedId], references: [id])
+  blocker   User     @relation("UserBlocking", fields: [blockerId], references: [id])
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
@@ -56,14 +56,14 @@ model BlockedUser {
 
 model Role {
   id          Int          @id @default(autoincrement())
-  name        String       @unique // ADMIN, MODERATOR, USER
+  name        String       @unique
   permissions Permission[]
   users       User[]
 }
 
 model Permission {
   id     Int    @id @default(autoincrement())
-  action String // e.g. "MANAGE_USERS", "DELETE_MESSAGES"
+  action String
   roleId Int
   role   Role   @relation(fields: [roleId], references: [id])
 }
@@ -72,29 +72,29 @@ model Contact {
   id        Int      @id @default(autoincrement())
   ownerId   Int
   contactId Int
-  owner     User     @relation("UserContacts", fields: [ownerId], references: [id])
-  contact   User     @relation("UserContactOf", fields: [contactId], references: [id])
   createdAt DateTime @default(now())
+  contact   User     @relation("UserContactOf", fields: [contactId], references: [id])
+  owner     User     @relation("UserContacts", fields: [ownerId], references: [id])
 }
 
 model Conversation {
   id           Int                       @id @default(autoincrement())
   title        String?
   isGroup      Boolean                   @default(false)
-  pageId       Int?                      // Link to a Page for support tickets
+  createdAt    DateTime                  @default(now())
+  pageId       Int?
   page         Page?                     @relation("PageConversations", fields: [pageId], references: [id])
   participants ConversationParticipant[]
   messages     Message[]
-  createdAt    DateTime                  @default(now())
 }
 
 model ConversationParticipant {
   id             Int          @id @default(autoincrement())
   userId         Int
   conversationId Int
-  user           User         @relation(fields: [userId], references: [id])
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
   joinedAt       DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
 
   @@unique([userId, conversationId])
   @@index([userId])
@@ -104,7 +104,6 @@ model ConversationParticipant {
 model Message {
   id             Int          @id @default(autoincrement())
   content        String
-  type           MessageType  @default(TEXT)
   senderId       Int
   conversationId Int
   mediaUrl       String?
@@ -112,27 +111,19 @@ model Message {
   isRead         Boolean      @default(false)
   isDeleted      Boolean      @default(false)
   timestamp      DateTime     @default(now())
-  sender         User         @relation("UserMessages", fields: [senderId], references: [id])
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  type           MessageType  @default(TEXT)
   attachments    Attachment[]
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation("UserMessages", fields: [senderId], references: [id])
 
   @@index([senderId])
   @@index([conversationId])
 }
 
-enum MessageType {
-  TEXT
-  IMAGE
-  VIDEO
-  AUDIO
-  FILE
-  SYSTEM
-}
-
 model Attachment {
   id        Int     @id @default(autoincrement())
   url       String
-  type      String // IMAGE, VIDEO, AUDIO, FILE
+  type      String
   messageId Int
   message   Message @relation(fields: [messageId], references: [id])
 }
@@ -165,20 +156,14 @@ model ScheduledCall {
   scheduledAt DateTime
   type        CallType @default(AUDIO)
   createdAt   DateTime @default(now())
-
   caller      User     @relation("ScheduledCaller", fields: [callerId], references: [id])
   receiver    User     @relation("ScheduledReceiver", fields: [receiverId], references: [id])
-}
-
-enum CallType {
-  AUDIO
-  VIDEO
 }
 
 model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int
-  type      String // MESSAGE, CALL, STATUS, SYSTEM
+  type      String
   content   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -188,7 +173,7 @@ model Notification {
 model Setting {
   id     Int    @id @default(autoincrement())
   userId Int
-  key    String // e.g. "theme", "language", "privacy"
+  key    String
   value  String
   user   User   @relation(fields: [userId], references: [id])
 }
@@ -196,65 +181,70 @@ model Setting {
 model AuditLog {
   id        Int      @id @default(autoincrement())
   userId    Int?
-  action    String // e.g. LOGIN, REGISTER, DELETE_MESSAGE
+  action    String
   details   String?
   createdAt DateTime @default(now())
   user      User?    @relation(fields: [userId], references: [id])
 }
 
-// ─── PAGES FEATURE ────────────────────────────────────────────────────────
-
 model Page {
-  id            Int       @id @default(autoincrement())
+  id            Int            @id @default(autoincrement())
   ownerId       Int
-  name          String    @unique
-  handle        String    @unique
+  name          String         @unique
+  handle        String         @unique
   bio           String?
   avatarUrl     String?
   coverPhotoUrl String?
-  isVerified    Boolean   @default(false)
+  isVerified    Boolean        @default(false)
   category      String
-  
-  owner         User      @relation("UserPages", fields: [ownerId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[] @relation("PageConversations")
+  owner         User           @relation("UserPages", fields: [ownerId], references: [id])
   followers     PageFollower[]
   posts         PagePost[]
-  conversations Conversation[] @relation("PageConversations")
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
 }
 
 model PageFollower {
   pageId        Int
   userId        Int
-  notifications Boolean   @default(true)
-  
-  page          Page      @relation(fields: [pageId], references: [id])
-  user          User      @relation("UserFollowedPages", fields: [userId], references: [id])
-  
+  notifications Boolean @default(true)
+  page          Page    @relation(fields: [pageId], references: [id])
+  user          User    @relation("UserFollowedPages", fields: [userId], references: [id])
+
   @@id([pageId, userId])
 }
 
 model PagePost {
-  id        Int       @id @default(autoincrement())
+  id        Int            @id @default(autoincrement())
   pageId    Int
   content   String
   mediaUrls String[]
-  views     Int       @default(0)
-  
-  page      Page      @relation(fields: [pageId], references: [id])
+  views     Int            @default(0)
+  createdAt DateTime       @default(now())
+  page      Page           @relation(fields: [pageId], references: [id])
   reactions PostReaction[]
-  
-  createdAt DateTime  @default(now())
 }
 
 model PostReaction {
-  id        Int       @id @default(autoincrement())
-  postId    Int
-  userId    Int
-  emoji     String
-  
-  post      PagePost  @relation(fields: [postId], references: [id])
-  user      User      @relation("UserPostReactions", fields: [userId], references: [id])
+  id     Int      @id @default(autoincrement())
+  postId Int
+  userId Int
+  emoji  String
+  post   PagePost @relation(fields: [postId], references: [id])
+  user   User     @relation("UserPostReactions", fields: [userId], references: [id])
 }
 
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+  SYSTEM
+}
+
+enum CallType {
+  AUDIO
+  VIDEO
+}

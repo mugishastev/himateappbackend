@@ -1,7 +1,0 @@
-export default {
-    earlyAccess: true,
-    schema: {
-        kind: 'file',
-        filePath: 'prisma/schema.prisma',
-    },
-}
