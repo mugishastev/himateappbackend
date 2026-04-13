@@ -15,11 +15,29 @@ if (result.error) {
 console.log('>>> DEBUG: DB URL LENGTH:', process.env.DATABASE_URL?.length || 0);
 
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcryptjs';
+import { Pool } from 'pg';
 
 console.log('>>> DEBUG: IMPORTS COMPLETED');
 
-const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+    throw new Error('DATABASE_URL is not defined');
+}
+
+const pool = new Pool({
+    connectionString: databaseUrl,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
+    connectionTimeoutMillis: 30000,
+    idleTimeoutMillis: 30000,
+    max: 10,
+});
+
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
     console.log('>>> DEBUG: MAIN FUNCTION START');
@@ -124,4 +142,5 @@ main()
     })
     .finally(async () => {
         await prisma.$disconnect();
+        await pool.end();
     });

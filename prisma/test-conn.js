@@ -1,12 +1,14 @@
 const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const { Pool } = require('pg');
+require('dotenv').config();
 
-const prisma = new PrismaClient({
-    datasources: {
-        db: {
-            url: 'postgresql://neondb_owner:npg_wX3qBnCfY0Ts@ep-steep-night-a886gcyq.eastus2.azure.neon.tech/himate?sslmode=require&channel_binding=require'
-        },
-    },
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
 });
+
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
     console.log('Testing connection...');
@@ -28,6 +30,7 @@ async function main() {
         console.error('Connection failed:', err);
     } finally {
         await prisma.$disconnect();
+        await pool.end();
     }
 }
 
