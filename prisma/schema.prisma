@@ -166,6 +166,9 @@ model Notification {
   type      String
   content   String
   isRead    Boolean  @default(false)
+  deliveryStatus String @default("SENT")
+  deliveredAt DateTime?
+  deliveryError String?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
 }

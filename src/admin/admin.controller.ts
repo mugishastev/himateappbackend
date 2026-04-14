@@ -19,6 +19,12 @@ export class AdminController {
         return this.adminService.getStats();
     }
 
+    @Get('health')
+    @ApiOperation({ summary: 'Get system health checks' })
+    getHealth() {
+        return this.adminService.getHealth();
+    }
+
     @Get('users')
     @ApiOperation({ summary: 'Get all users (admin view)' })
     getAllUsers(
@@ -37,6 +43,26 @@ export class AdminController {
         @Query('limit') limit = '20',
     ) {
         return this.adminService.getAllConversations(+page, +limit);
+    }
+
+    @Get('users/search')
+    @ApiOperation({ summary: 'Search users (admin view)' })
+    searchUsers(
+        @Query('q') q: string,
+        @Query('page') page = '1',
+        @Query('limit') limit = '20',
+    ) {
+        return this.adminService.searchUsers(q, +page, +limit);
+    }
+
+    @Get('conversations/search')
+    @ApiOperation({ summary: 'Search conversations by participant (admin view)' })
+    searchConversations(
+        @Query('q') q: string,
+        @Query('page') page = '1',
+        @Query('limit') limit = '20',
+    ) {
+        return this.adminService.searchConversations(q, +page, +limit);
     }
 
     @Get('messages')

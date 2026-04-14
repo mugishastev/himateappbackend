@@ -4,6 +4,7 @@ import { CreateNotificationDto, UpdateNotificationDto } from './dto/notification
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
 
 import { ChatGateway } from '../chat/chat.gateway';
+import { FcmService } from './fcm.service';
 
 @Injectable()
 export class NotificationsService {
@@ -11,6 +12,7 @@ export class NotificationsService {
         private prisma: PrismaService,
         @Inject(forwardRef(() => ChatGateway))
         private chatGateway: ChatGateway,
+        private fcmService: FcmService,
     ) { }
 
     async create(createNotificationDto: CreateNotificationDto) {
@@ -21,7 +23,33 @@ export class NotificationsService {
         // Push real-time notification to the user
         this.chatGateway.sendDirectNotification(notification.userId, notification);
 
-        return notification;
+        const user = await this.prisma.user.findUnique({ where: { id: notification.userId } });
+        let deliveryStatus: 'SENT' | 'FAILED' = 'SENT';
+        let deliveryError: string | null = null;
+
+        if (user?.fcmToken) {
+            const ok = await this.fcmService.sendPushNotification(
+                user.fcmToken,
+                notification.type,
+                notification.content,
+                { notificationId: String(notification.id), type: notification.type },
+            );
+            if (!ok) {
+                deliveryStatus = 'FAILED';
+                deliveryError = 'FCM send failed';
+            }
+        }
+
+        const updated = await this.prisma.notification.update({
+            where: { id: notification.id },
+            data: {
+                deliveryStatus,
+                deliveredAt: new Date(),
+                deliveryError,
+            },
+        });
+
+        return updated;
     }
 
     async findByUser(userId: number, paginationDto: PaginationDto) {

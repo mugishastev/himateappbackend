@@ -35,8 +35,10 @@ export class FcmService implements OnModuleInit {
 
             await admin.messaging().send(message);
             console.log('Push notification sent successfully');
+            return true;
         } catch (error) {
             console.error('Error sending push notification:', error);
+            return false;
         }
     }
 
@@ -50,8 +52,10 @@ export class FcmService implements OnModuleInit {
 
             await admin.messaging().send(message);
             console.log(`Push notification sent to topic: ${topic}`);
+            return true;
         } catch (error) {
             console.error('Error sending topic notification:', error);
+            return false;
         }
     }
 
