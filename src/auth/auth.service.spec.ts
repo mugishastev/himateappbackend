@@ -7,6 +7,20 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { mockPrismaService } from '../../test/mocks/prisma.service.mock';
 
+jest.mock('ioredis', () => {
+    const mockRedis = jest.fn().mockImplementation(() => ({
+        on: jest.fn(),
+        get: jest.fn(),
+        set: jest.fn(),
+        del: jest.fn(),
+        quit: jest.fn(),
+    }));
+    return {
+        Redis: mockRedis,
+        default: mockRedis,
+    };
+});
+
 describe('AuthService', () => {
     let service: AuthService;
     let prisma: PrismaService;
@@ -40,7 +54,7 @@ describe('AuthService', () => {
 
     describe('register', () => {
         it('should throw ConflictException if email exists', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue({ id: 1 });
+            mockPrismaService.user.findUnique.mockResolvedValue({ id: 1, isVerified: true });
             await expect(service.register({ email: 'test@test.com', password: 'password' }))
                 .rejects.toThrow(ConflictException);
         });
