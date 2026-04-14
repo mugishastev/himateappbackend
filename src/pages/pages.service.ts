@@ -113,6 +113,22 @@ export class PagesService {
         return { success: true, message: 'Successfully followed page' };
     }
 
+    async unfollowPage(userId: number, pageId: number) {
+        const page = await this.prisma.page.findUnique({ where: { id: pageId } });
+        if (!page) throw new NotFoundException('Page not found');
+
+        await this.prisma.pageFollower.deleteMany({
+            where: { pageId, userId },
+        });
+
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (user?.fcmToken) {
+            await this.fcmService.unsubscribeFromTopic([user.fcmToken], `page_${pageId}`);
+        }
+
+        return { success: true, message: 'Successfully unfollowed page' };
+    }
+
     async createPost(userId: number, pageId: number, dto: CreatePagePostDto) {
         const page = await this.prisma.page.findUnique({ where: { id: pageId } });
         if (!page) throw new NotFoundException('Page not found');

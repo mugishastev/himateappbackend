@@ -9,13 +9,14 @@ export class ConversationsService {
 
     // ─── Create ───────────────────────────────────────────────────────────────
 
-    async create(createConversationDto: CreateConversationDto) {
+    async create(createConversationDto: CreateConversationDto, currentUserId: number) {
+        const uniqueUserIds = Array.from(new Set([...(createConversationDto.userIds || []), currentUserId]));
         const { userIds, ...data } = createConversationDto;
         return this.prisma.conversation.create({
             data: {
                 ...data,
                 participants: {
-                    create: userIds.map((userId) => ({ userId })),
+                    create: uniqueUserIds.map((userId) => ({ userId })),
                 },
             },
             include: {
@@ -48,9 +49,10 @@ export class ConversationsService {
 
     async findByUser(userId: number, userRole: string, paginationDto: PaginationDto) {
         const { skip, take } = getPaginationParams(paginationDto);
+        const roleName = typeof userRole === 'string' ? userRole : (userRole as any)?.name;
 
         // If ADMIN, don't filter by participation
-        const where = userRole === 'ADMIN' ? {} : { participants: { some: { userId } } };
+        const where = roleName === 'ADMIN' ? {} : { participants: { some: { userId } } };
 
         const [rawConversations, total] = await Promise.all([
             this.prisma.conversation.findMany({
@@ -125,6 +127,7 @@ export class ConversationsService {
     // ─── Find One ─────────────────────────────────────────────────────────────
 
     async findOne(id: number, userId: number, userRole: string) {
+        const roleName = typeof userRole === 'string' ? userRole : (userRole as any)?.name;
         const conversation = await this.prisma.conversation.findUnique({
             where: { id },
             include: {
@@ -141,7 +144,7 @@ export class ConversationsService {
         if (!conversation) throw new NotFoundException(`Conversation with ID ${id} not found`);
 
         // If not ADMIN, verify participation
-        if (userRole !== 'ADMIN') {
+        if (roleName !== 'ADMIN') {
             const isParticipant = conversation.participants.some(p => p.userId === userId);
             if (!isParticipant) throw new UnauthorizedException('You are not a participant in this conversation');
         }
@@ -151,7 +154,8 @@ export class ConversationsService {
 
     // ─── Update ───────────────────────────────────────────────────────────────
 
-    async update(id: number, updateConversationDto: UpdateConversationDto) {
+    async update(id: number, updateConversationDto: UpdateConversationDto, currentUserId: number, currentUserRole: string) {
+        await this.assertCanManageConversation(id, currentUserId, currentUserRole);
         return this.prisma.conversation.update({
             where: { id },
             data: updateConversationDto,
@@ -160,7 +164,8 @@ export class ConversationsService {
 
     // ─── Add Participant ──────────────────────────────────────────────────────
 
-    async addParticipant(conversationId: number, userId: number) {
+    async addParticipant(conversationId: number, userId: number, currentUserId: number, currentUserRole: string) {
+        await this.assertCanManageConversation(conversationId, currentUserId, currentUserRole);
         const existing = await this.prisma.conversationParticipant.findFirst({
             where: { conversationId, userId },
         });
@@ -174,7 +179,8 @@ export class ConversationsService {
 
     // ─── Remove Participant ───────────────────────────────────────────────────
 
-    async removeParticipant(conversationId: number, userId: number) {
+    async removeParticipant(conversationId: number, userId: number, currentUserId: number, currentUserRole: string) {
+        await this.assertCanManageConversation(conversationId, currentUserId, currentUserRole);
         const existing = await this.prisma.conversationParticipant.findFirst({
             where: { conversationId, userId },
         });
@@ -187,7 +193,8 @@ export class ConversationsService {
 
     // ─── Delete ───────────────────────────────────────────────────────────────
 
-    async remove(id: number) {
+    async remove(id: number, currentUserId: number, currentUserRole: string) {
+        await this.assertCanManageConversation(id, currentUserId, currentUserRole);
         return this.prisma.$transaction([
             // 1. Delete all messages in the conversation first
             this.prisma.message.deleteMany({ where: { conversationId: id } }),
@@ -196,5 +203,20 @@ export class ConversationsService {
             // 3. Finally delete the conversation itself
             this.prisma.conversation.delete({ where: { id } }),
         ]);
+    }
+
+    private async assertCanManageConversation(conversationId: number, userId: number, userRole: string) {
+        const roleName = typeof userRole === 'string' ? userRole : (userRole as any)?.name;
+        if (roleName === 'ADMIN') {
+            return;
+        }
+
+        const participant = await this.prisma.conversationParticipant.findFirst({
+            where: { conversationId, userId },
+        });
+
+        if (!participant) {
+            throw new UnauthorizedException('You are not a participant in this conversation');
+        }
     }
 }

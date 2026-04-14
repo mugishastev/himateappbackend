@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MessagesService } from './messages.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../utils/cloudinary.service';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { mockPrismaService } from '../../test/mocks/prisma.service.mock';
 
 describe('MessagesService', () => {
@@ -33,14 +33,20 @@ describe('MessagesService', () => {
     describe('findOne', () => {
         it('should throw NotFoundException if message does not exist', async () => {
             mockPrismaService.message.findUnique.mockResolvedValue(null);
-            await expect(service.findOne(1)).rejects.toThrow(NotFoundException);
+            await expect(service.findOne(1, 1, 'USER')).rejects.toThrow(NotFoundException);
         });
 
         it('should return the message if it exists', async () => {
-            const mockMessage = { id: 1, content: 'hello' };
+            const mockMessage = { id: 1, content: 'hello', conversation: { participants: [{ userId: 1 }] } };
             mockPrismaService.message.findUnique.mockResolvedValue(mockMessage);
-            const result = await service.findOne(1);
+            const result = await service.findOne(1, 1, 'USER');
             expect(result).toEqual(mockMessage);
+        });
+
+        it('should throw UnauthorizedException if user is not a participant', async () => {
+            const mockMessage = { id: 1, content: 'hello', conversation: { participants: [{ userId: 2 }] } };
+            mockPrismaService.message.findUnique.mockResolvedValue(mockMessage);
+            await expect(service.findOne(1, 1, 'USER')).rejects.toThrow(UnauthorizedException);
         });
     });
 

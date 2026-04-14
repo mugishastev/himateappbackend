@@ -17,10 +17,11 @@ export class RolesGuard implements CanActivate {
         }
 
         const { user } = context.switchToHttp().getRequest();
+        const roleName = typeof user?.role === 'string' ? user.role : user?.role?.name;
 
         // ADMIN always has full access
-        if (user?.role === 'ADMIN') return true;
+        if (roleName === 'ADMIN') return true;
 
-        return requiredRoles.includes(user?.role);
+        return requiredRoles.includes(roleName);
     }
 }

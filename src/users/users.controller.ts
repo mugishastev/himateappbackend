@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query, UseInterceptors, UploadedFile, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
@@ -6,15 +6,22 @@ import { PaginationDto } from '../utils/pagination.util';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+
+function isAdmin(user: any) {
+    return user?.role?.name === 'ADMIN' || user?.role === 'ADMIN';
+}
 
 @ApiTags('Users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Post()
+    @Roles('ADMIN')
     @ApiOperation({ summary: 'Create a new user (Admin only)' })
     @ApiResponse({ status: 201, description: 'User created' })
     create(@Body() createUserDto: CreateUserDto) {
@@ -32,14 +39,20 @@ export class UsersController {
     @ApiOperation({ summary: 'Get user by ID' })
     @ApiResponse({ status: 200, description: 'Return user details' })
     @ApiResponse({ status: 404, description: 'User not found' })
-    findOne(@Param('id', ParseIntPipe) id: number) {
+    findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: any) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) {
+            throw new ForbiddenException('You can only access your own user record');
+        }
         return this.usersService.findOne(id);
     }
 
     @Patch(':id')
     @ApiOperation({ summary: 'Update user details' })
     @ApiResponse({ status: 200, description: 'User updated' })
-    update(@Param('id', ParseIntPipe) id: number, @Body() updateUserDto: UpdateUserDto) {
+    update(@Param('id', ParseIntPipe) id: number, @Body() updateUserDto: UpdateUserDto, @CurrentUser() currentUser: any) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) {
+            throw new ForbiddenException('You can only update your own user record');
+        }
         return this.usersService.update(id, updateUserDto);
     }
 
@@ -52,7 +65,11 @@ export class UsersController {
     async uploadProfileImage(
         @Param('id', ParseIntPipe) id: number,
         @UploadedFile() file: Express.Multer.File,
+        @CurrentUser() currentUser: any,
     ) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) {
+            throw new ForbiddenException('You can only update your own profile image');
+        }
         return this.usersService.updateProfileImage(id, file);
     }
 
@@ -63,7 +80,11 @@ export class UsersController {
     async updateFcmToken(
         @Param('id', ParseIntPipe) id: number,
         @Body('fcmToken') fcmToken: string,
+        @CurrentUser() currentUser: any,
     ) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) {
+            throw new ForbiddenException('You can only update your own FCM token');
+        }
         return this.usersService.updateFcmToken(id, fcmToken);
     }
 
@@ -75,7 +96,11 @@ export class UsersController {
         @Param('id', ParseIntPipe) id: number,
         @Body('currentPassword') currentPassword: string,
         @Body('newPassword') newPassword: string,
+        @CurrentUser() currentUser: any,
     ) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) {
+            throw new ForbiddenException('You can only change your own password');
+        }
         return this.usersService.changePassword(id, currentPassword, newPassword);
     }
 
@@ -109,7 +134,10 @@ export class UsersController {
     @Delete(':id')
     @ApiOperation({ summary: 'Delete user' })
     @ApiResponse({ status: 200, description: 'User deleted' })
-    remove(@Param('id', ParseIntPipe) id: number) {
+    remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: any) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) {
+            throw new ForbiddenException('You can only delete your own user record');
+        }
         return this.usersService.remove(id);
     }
 }

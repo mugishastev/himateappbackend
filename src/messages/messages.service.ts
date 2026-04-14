@@ -47,8 +47,9 @@ export class MessagesService {
     // ─── Find All in Conversation ─────────────────────────────────────────────
 
     async findByConversation(conversationId: number, userId: number, userRole: string, paginationDto: PaginationDto) {
+        const roleName = typeof userRole === 'string' ? userRole : (userRole as any)?.name;
         // If not ADMIN, verify participation in the conversation
-        if (userRole !== 'ADMIN') {
+        if (roleName !== 'ADMIN') {
             const isParticipant = await this.prisma.conversationParticipant.findFirst({
                 where: { conversationId, userId },
             });
@@ -77,20 +78,41 @@ export class MessagesService {
 
     // ─── Find One ─────────────────────────────────────────────────────────────
 
-    async findOne(id: number) {
+    async findOne(id: number, userId: number, userRole: string) {
+        const roleName = typeof userRole === 'string' ? userRole : (userRole as any)?.name;
         const message = await this.prisma.message.findUnique({
             where: { id },
-            include: { sender: true, attachments: true },
+            include: {
+                sender: true,
+                attachments: true,
+                conversation: { include: { participants: true } },
+            },
         });
         if (!message) throw new NotFoundException(`Message with ID ${id} not found`);
+        if (roleName !== 'ADMIN') {
+            const isParticipant = message.conversation.participants.some((participant) => participant.userId === userId);
+            if (!isParticipant) {
+                throw new UnauthorizedException('You are not a participant in this conversation');
+            }
+        }
         return message;
     }
 
     // ─── Mark as Read ─────────────────────────────────────────────────────────
 
-    async markAsRead(id: number) {
-        const message = await this.prisma.message.findUnique({ where: { id } });
+    async markAsRead(id: number, userId: number, userRole: string) {
+        const roleName = typeof userRole === 'string' ? userRole : (userRole as any)?.name;
+        const message = await this.prisma.message.findUnique({
+            where: { id },
+            include: { conversation: { include: { participants: true } } },
+        });
         if (!message) throw new NotFoundException(`Message with ID ${id} not found`);
+        if (roleName !== 'ADMIN') {
+            const isParticipant = message.conversation.participants.some((participant) => participant.userId === userId);
+            if (!isParticipant) {
+                throw new UnauthorizedException('You are not a participant in this conversation');
+            }
+        }
 
         return this.prisma.message.update({
             where: { id },
@@ -116,11 +138,12 @@ export class MessagesService {
     // ─── Delete ───────────────────────────────────────────────────────────────
 
     async remove(id: number, userId: number, userRole: string) {
+        const roleName = typeof userRole === 'string' ? userRole : (userRole as any)?.name;
         const message = await this.prisma.message.findUnique({ where: { id } });
         if (!message) throw new NotFoundException(`Message with ID ${id} not found`);
 
         // Only sender or ADMIN/MODERATOR can delete
-        if (message.senderId !== userId && userRole !== 'ADMIN' && userRole !== 'MODERATOR') {
+        if (message.senderId !== userId && roleName !== 'ADMIN' && roleName !== 'MODERATOR') {
             throw new UnauthorizedException('You can only delete your own messages');
         }
 

@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ChatGateway } from '../chat/chat.gateway';
 
 @Injectable()
 export class AdminService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private chatGateway: ChatGateway,
+    ) { }
 
     async getStats() {
         const now = new Date();
@@ -246,13 +250,25 @@ export class AdminService {
         });
 
         // Create a notification for every user
-        await this.prisma.notification.createMany({
-            data: users.map((u) => ({
+        const notifications = users.map((u) => ({
                 userId: u.id,
                 type: 'BROADCAST',
                 content: `${title}: ${message}`,
                 isRead: false,
-            })),
+            }));
+
+        await this.prisma.notification.createMany({
+            data: notifications,
+        });
+
+        for (const notification of notifications) {
+            this.chatGateway.sendDirectNotification(notification.userId, notification);
+        }
+
+        this.chatGateway.server?.emit('systemAnnouncement', {
+            title,
+            content: message,
+            timestamp: new Date(),
         });
 
         // Log in audit

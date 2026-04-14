@@ -48,6 +48,12 @@ export class PagesController {
     }
 
     @UseGuards(JwtAuthGuard)
+    @Delete(':id/follow')
+    unfollowPage(@CurrentUser() user: any, @Param('id', ParseIntPipe) pageId: number) {
+        return this.pagesService.unfollowPage(user.id, pageId);
+    }
+
+    @UseGuards(JwtAuthGuard)
     @Post(':id/posts')
     createPost(
         @CurrentUser() user: any,

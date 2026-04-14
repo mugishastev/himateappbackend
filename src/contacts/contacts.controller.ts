@@ -1,13 +1,20 @@
 import {
     Controller, Get, Post, Body, Param, Delete,
-    ParseIntPipe, Query, UseGuards
+    ParseIntPipe, Query, UseGuards, ForbiddenException
 } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
 import { CreateContactDto } from './dto/contact.dto';
 import { PaginationDto } from '../utils/pagination.util';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 
-@UseGuards(JwtAuthGuard)
+function isAdmin(user: any) {
+    return user?.role?.name === 'ADMIN' || user?.role === 'ADMIN';
+}
+
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('contacts')
 export class ContactsController {
     constructor(private readonly contactsService: ContactsService) { }
@@ -18,7 +25,8 @@ export class ContactsController {
      * Body: { ownerId: number, contactId: number }
      */
     @Post()
-    create(@Body() createContactDto: CreateContactDto) {
+    create(@Body() createContactDto: CreateContactDto, @CurrentUser() currentUser: any) {
+        createContactDto.ownerId = currentUser.id;
         return this.contactsService.create(createContactDto);
     }
 
@@ -27,6 +35,7 @@ export class ContactsController {
      * Get all contacts (paginated).
      */
     @Get()
+    @Roles('ADMIN')
     findAll(@Query() paginationDto: PaginationDto) {
         return this.contactsService.findAll(paginationDto);
     }
@@ -40,7 +49,11 @@ export class ContactsController {
     findByUser(
         @Param('userId', ParseIntPipe) userId: number,
         @Query() paginationDto: PaginationDto,
+        @CurrentUser() currentUser: any,
     ) {
+        if (!isAdmin(currentUser) && currentUser.id !== userId) {
+            throw new ForbiddenException('You can only access your own contacts');
+        }
         return this.contactsService.findByUser(userId, paginationDto);
     }
 
@@ -49,8 +62,8 @@ export class ContactsController {
      * Get a single contact record by its ID.
      */
     @Get(':id')
-    findOne(@Param('id', ParseIntPipe) id: number) {
-        return this.contactsService.findOne(id);
+    findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: any) {
+        return this.contactsService.findOne(id, currentUser.id, isAdmin(currentUser));
     }
 
     /**
@@ -58,7 +71,7 @@ export class ContactsController {
      * Remove a contact record by its ID.
      */
     @Delete(':id')
-    remove(@Param('id', ParseIntPipe) id: number) {
-        return this.contactsService.remove(id);
+    remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: any) {
+        return this.contactsService.remove(id, currentUser.id, isAdmin(currentUser));
     }
 }

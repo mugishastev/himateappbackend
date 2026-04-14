@@ -33,7 +33,7 @@ describe('ConversationsService', () => {
             const dto = { userIds: [1, 2], title: 'Test Group', isGroup: true };
             mockPrismaService.conversation.create.mockResolvedValue({ id: 1, ...dto });
 
-            const result = await service.create(dto);
+            const result = await service.create(dto, 1);
             expect(result.id).toBe(1);
             expect(mockPrismaService.conversation.create).toHaveBeenCalled();
         });
@@ -66,18 +66,22 @@ describe('ConversationsService', () => {
 
     describe('addParticipant', () => {
         it('should add participant if not already in conversation', async () => {
-            mockPrismaService.conversationParticipant.findFirst.mockResolvedValue(null);
+            mockPrismaService.conversationParticipant.findFirst
+                .mockResolvedValueOnce({ id: 10, conversationId: 1, userId: 1 })
+                .mockResolvedValueOnce(null);
             mockPrismaService.conversationParticipant.create.mockResolvedValue({ id: 1 });
 
-            const result = await service.addParticipant(1, 3);
+            const result = await service.addParticipant(1, 3, 1, 'USER');
             expect(result.id).toBe(1);
             expect(mockPrismaService.conversationParticipant.create).toHaveBeenCalled();
         });
 
         it('should throw ConflictException if already a participant', async () => {
-            mockPrismaService.conversationParticipant.findFirst.mockResolvedValue({ id: 1 });
+            mockPrismaService.conversationParticipant.findFirst
+                .mockResolvedValueOnce({ id: 10, conversationId: 1, userId: 1 })
+                .mockResolvedValueOnce({ id: 1 });
 
-            await expect(service.addParticipant(1, 1)).rejects.toThrow(ConflictException);
+            await expect(service.addParticipant(1, 1, 1, 'USER')).rejects.toThrow(ConflictException);
         });
     });
 });

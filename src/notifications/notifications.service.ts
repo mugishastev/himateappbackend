@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateNotificationDto, UpdateNotificationDto } from './dto/notification.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
@@ -44,7 +44,12 @@ export class NotificationsService {
         };
     }
 
-    async update(id: number, updateNotificationDto: UpdateNotificationDto) {
+    async update(id: number, updateNotificationDto: UpdateNotificationDto, currentUserId: number, isAdmin = false) {
+        const notification = await this.prisma.notification.findUnique({ where: { id } });
+        if (!notification) throw new NotFoundException('Notification not found');
+        if (!isAdmin && notification.userId !== currentUserId) {
+            throw new ForbiddenException('You can only update your own notifications');
+        }
         return this.prisma.notification.update({
             where: { id },
             data: updateNotificationDto,
@@ -58,7 +63,12 @@ export class NotificationsService {
         });
     }
 
-    async remove(id: number) {
+    async remove(id: number, currentUserId: number, isAdmin = false) {
+        const notification = await this.prisma.notification.findUnique({ where: { id } });
+        if (!notification) throw new NotFoundException('Notification not found');
+        if (!isAdmin && notification.userId !== currentUserId) {
+            throw new ForbiddenException('You can only delete your own notifications');
+        }
         return this.prisma.notification.delete({
             where: { id },
         });

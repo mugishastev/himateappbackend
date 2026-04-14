@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ContactsService } from './contacts.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import { NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { mockPrismaService } from '../../test/mocks/prisma.service.mock';
 
 describe('ContactsService', () => {
@@ -52,23 +52,29 @@ describe('ContactsService', () => {
             const contact = { id: 1, ownerId: 1, contactId: 2 };
             mockPrismaService.contact.findUnique.mockResolvedValue(contact);
 
-            const result = await service.findOne(1);
+            const result = await service.findOne(1, 1);
             expect(result).toEqual(contact);
         });
 
         it('should throw NotFoundException if contact not found', async () => {
             mockPrismaService.contact.findUnique.mockResolvedValue(null);
 
-            await expect(service.findOne(1)).rejects.toThrow(NotFoundException);
+            await expect(service.findOne(1, 1)).rejects.toThrow(NotFoundException);
+        });
+
+        it('should throw ForbiddenException if user does not own the contact', async () => {
+            mockPrismaService.contact.findUnique.mockResolvedValue({ id: 1, ownerId: 2, contactId: 3 });
+
+            await expect(service.findOne(1, 1)).rejects.toThrow(ForbiddenException);
         });
     });
 
     describe('remove', () => {
         it('should delete a contact if it exists', async () => {
-            mockPrismaService.contact.findUnique.mockResolvedValue({ id: 1 });
+            mockPrismaService.contact.findUnique.mockResolvedValue({ id: 1, ownerId: 1 });
             mockPrismaService.contact.delete.mockResolvedValue({ id: 1 });
 
-            const result = await service.remove(1);
+            const result = await service.remove(1, 1);
             expect(result.id).toBe(1);
             expect(mockPrismaService.contact.delete).toHaveBeenCalled();
         });

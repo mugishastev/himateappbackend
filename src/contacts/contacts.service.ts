@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateContactDto } from './dto/contact.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
@@ -59,20 +59,22 @@ export class ContactsService {
 
     // ─── Find One ─────────────────────────────────────────────────────────────
 
-    async findOne(id: number) {
+    async findOne(id: number, currentUserId: number, isAdmin = false) {
         const contact = await this.prisma.contact.findUnique({
             where: { id },
             include: { owner: true, contact: true },
         });
         if (!contact) throw new NotFoundException(`Contact with ID ${id} not found`);
+        if (!isAdmin && contact.ownerId !== currentUserId) {
+            throw new ForbiddenException('You can only access your own contacts');
+        }
         return contact;
     }
 
     // ─── Delete ───────────────────────────────────────────────────────────────
 
-    async remove(id: number) {
-        const contact = await this.prisma.contact.findUnique({ where: { id } });
-        if (!contact) throw new NotFoundException(`Contact with ID ${id} not found`);
+    async remove(id: number, currentUserId: number, isAdmin = false) {
+        await this.findOne(id, currentUserId, isAdmin);
         return this.prisma.contact.delete({ where: { id } });
     }
 }

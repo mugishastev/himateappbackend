@@ -47,8 +47,8 @@ export class MessagesController {
     @Get(':id')
     @ApiOperation({ summary: 'Get a single message by ID' })
     @ApiResponse({ status: 200, description: 'Return message details' })
-    findOne(@Param('id', ParseIntPipe) id: number) {
-        return this.messagesService.findOne(id);
+    findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+        return this.messagesService.findOne(id, user.id, user.role);
     }
 
     @Patch('conversation/:id/read')
@@ -64,8 +64,8 @@ export class MessagesController {
     @Patch(':id/read')
     @ApiOperation({ summary: 'Mark message as read' })
     @ApiResponse({ status: 200, description: 'Message marked as read' })
-    markAsRead(@Param('id', ParseIntPipe) id: number) {
-        return this.messagesService.markAsRead(id);
+    markAsRead(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+        return this.messagesService.markAsRead(id, user.id, user.role);
     }
 
     @Patch(':id')

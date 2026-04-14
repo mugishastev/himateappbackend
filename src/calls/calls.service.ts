@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCallDto, UpdateCallDto } from './dto/call.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
@@ -71,23 +71,28 @@ export class CallsService {
         };
     }
 
-    async findOne(id: number) {
+    async findOne(id: number, currentUserId: number, isAdmin = false) {
         const call = await this.prisma.call.findUnique({
             where: { id },
             include: { caller: true, receiver: true },
         });
         if (!call) throw new NotFoundException(`Call with ID ${id} not found`);
+        if (!isAdmin && call.callerId !== currentUserId && call.receiverId !== currentUserId) {
+            throw new ForbiddenException('You can only access your own calls');
+        }
         return call;
     }
 
-    async update(id: number, updateCallDto: UpdateCallDto) {
+    async update(id: number, updateCallDto: UpdateCallDto, currentUserId: number, isAdmin = false) {
+        await this.findOne(id, currentUserId, isAdmin);
         return this.prisma.call.update({
             where: { id },
             data: updateCallDto,
         });
     }
 
-    async remove(id: number) {
+    async remove(id: number, currentUserId: number, isAdmin = false) {
+        await this.findOne(id, currentUserId, isAdmin);
         return this.prisma.call.delete({
             where: { id },
         });

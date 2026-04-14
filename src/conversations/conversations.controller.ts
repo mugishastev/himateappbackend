@@ -1,6 +1,6 @@
 import {
     Controller, Get, Post, Body, Patch, Param, Delete,
-    ParseIntPipe, Query, UseGuards
+    ParseIntPipe, Query, UseGuards, ForbiddenException
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ConversationsService } from './conversations.service';
@@ -21,8 +21,8 @@ export class ConversationsController {
     @Post()
     @ApiOperation({ summary: 'Create a new conversation' })
     @ApiResponse({ status: 201, description: 'Conversation created successfully' })
-    create(@Body() createConversationDto: CreateConversationDto) {
-        return this.conversationsService.create(createConversationDto);
+    create(@Body() createConversationDto: CreateConversationDto, @CurrentUser() currentUser: any) {
+        return this.conversationsService.create(createConversationDto, currentUser.id);
     }
 
     @Get()
@@ -41,6 +41,10 @@ export class ConversationsController {
         @Query() paginationDto: PaginationDto,
         @CurrentUser() currentUser: any,
     ) {
+        const currentRole = typeof currentUser.role === 'string' ? currentUser.role : currentUser.role?.name;
+        if (currentRole !== 'ADMIN' && currentUser.id !== userId) {
+            throw new ForbiddenException('You can only access your own conversations');
+        }
         return this.conversationsService.findByUser(userId, currentUser.role, paginationDto);
     }
 
@@ -61,8 +65,9 @@ export class ConversationsController {
     update(
         @Param('id', ParseIntPipe) id: number,
         @Body() updateConversationDto: UpdateConversationDto,
+        @CurrentUser() currentUser: any,
     ) {
-        return this.conversationsService.update(id, updateConversationDto);
+        return this.conversationsService.update(id, updateConversationDto, currentUser.id, currentUser.role);
     }
 
     @Post(':id/participants')
@@ -71,8 +76,9 @@ export class ConversationsController {
     addParticipant(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: AddParticipantDto,
+        @CurrentUser() currentUser: any,
     ) {
-        return this.conversationsService.addParticipant(id, dto.userId);
+        return this.conversationsService.addParticipant(id, dto.userId, currentUser.id, currentUser.role);
     }
 
     @Delete(':id/participants/:userId')
@@ -81,14 +87,15 @@ export class ConversationsController {
     removeParticipant(
         @Param('id', ParseIntPipe) id: number,
         @Param('userId', ParseIntPipe) userId: number,
+        @CurrentUser() currentUser: any,
     ) {
-        return this.conversationsService.removeParticipant(id, userId);
+        return this.conversationsService.removeParticipant(id, userId, currentUser.id, currentUser.role);
     }
 
     @Delete(':id')
     @ApiOperation({ summary: 'Delete a conversation' })
     @ApiResponse({ status: 200, description: 'Conversation deleted' })
-    remove(@Param('id', ParseIntPipe) id: number) {
-        return this.conversationsService.remove(id);
+    remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: any) {
+        return this.conversationsService.remove(id, currentUser.id, currentUser.role);
     }
 }

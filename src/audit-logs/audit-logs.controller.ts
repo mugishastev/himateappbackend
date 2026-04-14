@@ -4,8 +4,11 @@ import { CreateAuditLogDto } from './dto/audit-log.dto';
 import { PaginationDto } from '../utils/pagination.util';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN')
 @Controller('audit-logs')
 export class AuditLogsController {
     constructor(private readonly auditLogsService: AuditLogsService) { }
