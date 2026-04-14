@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, ParseIntPipe, Query, Patch, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, ParseIntPipe, Query, Patch, UseInterceptors, UploadedFile, Delete } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PagesService } from './pages.service';
 import { CreatePageDto, CreatePagePostDto } from './dto/page.dto';
