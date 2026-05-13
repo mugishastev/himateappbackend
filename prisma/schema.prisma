@@ -39,6 +39,18 @@ model User {
   settings          Setting[]
   statuses          Status[]
   role              Role?                     @relation(fields: [roleId], references: [id])
+
+  // Preferences / Settings
+  theme             String                    @default("Dark")
+  showLastSeen      Boolean                   @default(true)
+  showProfilePhoto  Boolean                   @default(true)
+  readReceipts      Boolean                   @default(true)
+  messageNotifs     Boolean                   @default(true)
+  soundEnabled      Boolean                   @default(true)
+  desktopNotifs     Boolean                   @default(true)
+  twoStepEnabled    Boolean                   @default(false)
+  enterToSend       Boolean                   @default(true)
+  chatWallpaper     String?
 }
 
 model BlockedUser {

@@ -77,4 +77,55 @@ export class UpdateUserDto {
     @IsOptional()
     @IsInt()
     roleId?: number;
+
+    // Preferences / Settings
+    @ApiProperty({ example: 'Dark', required: false })
+    @IsOptional()
+    @IsString()
+    theme?: string;
+
+    @ApiProperty({ example: true, required: false })
+    @IsOptional()
+    @IsBoolean()
+    showLastSeen?: boolean;
+
+    @ApiProperty({ example: true, required: false })
+    @IsOptional()
+    @IsBoolean()
+    showProfilePhoto?: boolean;
+
+    @ApiProperty({ example: true, required: false })
+    @IsOptional()
+    @IsBoolean()
+    readReceipts?: boolean;
+
+    @ApiProperty({ example: true, required: false })
+    @IsOptional()
+    @IsBoolean()
+    messageNotifs?: boolean;
+
+    @ApiProperty({ example: true, required: false })
+    @IsOptional()
+    @IsBoolean()
+    soundEnabled?: boolean;
+
+    @ApiProperty({ example: true, required: false })
+    @IsOptional()
+    @IsBoolean()
+    desktopNotifs?: boolean;
+
+    @ApiProperty({ example: false, required: false })
+    @IsOptional()
+    @IsBoolean()
+    twoStepEnabled?: boolean;
+
+    @ApiProperty({ example: true, required: false })
+    @IsOptional()
+    @IsBoolean()
+    enterToSend?: boolean;
+
+    @ApiProperty({ example: 'bg-[#0b141a]', required: false })
+    @IsOptional()
+    @IsString()
+    chatWallpaper?: string;
 }

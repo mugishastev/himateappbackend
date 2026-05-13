@@ -47,8 +47,15 @@ export class UsersService {
             this.prisma.user.count({ where }),
         ]);
 
+        const processedData = data.map(user => {
+            const u = { ...user } as any;
+            if (!u.showLastSeen) u.lastSeen = null;
+            if (!u.showProfilePhoto) u.profileImage = null;
+            return u;
+        });
+
         return {
-            data,
+            data: processedData,
             total,
             page: paginationDto.page,
             limit: paginationDto.limit,
@@ -61,7 +68,13 @@ export class UsersService {
             include: { role: true },
         });
         if (!user) throw new NotFoundException(`User with ID ${id} not found`);
-        return user;
+        
+        // Apply privacy settings
+        const u = { ...user } as any;
+        if (!u.showLastSeen) u.lastSeen = null;
+        if (!u.showProfilePhoto) u.profileImage = null;
+
+        return u;
     }
 
     async update(id: number, updateUserDto: UpdateUserDto) {
