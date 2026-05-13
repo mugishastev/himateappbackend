@@ -14,7 +14,12 @@ class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
 
   async connectToRedis(): Promise<void> {
-    const pubClient = new Redis(process.env.REDIS_URL);
+    const redisOptions = {
+      connectTimeout: 15000,
+      maxRetriesPerRequest: null,
+      retryStrategy: (times: number) => Math.min(times * 100, 3000),
+    };
+    const pubClient = new Redis(process.env.REDIS_URL, redisOptions);
     const subClient = pubClient.duplicate();
 
     pubClient.on('error', (err) => console.error('Redis PubClient Error:', err));

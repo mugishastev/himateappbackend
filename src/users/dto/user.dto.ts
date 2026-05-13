@@ -128,4 +128,9 @@ export class UpdateUserDto {
     @IsOptional()
     @IsString()
     chatWallpaper?: string;
+
+    @ApiProperty({ example: 80, required: false })
+    @IsOptional()
+    @IsInt()
+    wallpaperOpacity?: number;
 }

@@ -15,7 +15,11 @@ export class AuthService {
         private jwtService: JwtService,
         private mailService: MailService,
     ) {
-        this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+        this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+            connectTimeout: 15000,
+            maxRetriesPerRequest: null,
+            retryStrategy: (times) => Math.min(times * 100, 3000),
+        });
         this.redisClient.on('error', (err) => console.error('[AuthService] Redis error:', err));
     }
 

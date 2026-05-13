@@ -51,6 +51,7 @@ model User {
   twoStepEnabled    Boolean                   @default(false)
   enterToSend       Boolean                   @default(true)
   chatWallpaper     String?
+  wallpaperOpacity  Int                       @default(100)
 }
 
 model BlockedUser {
