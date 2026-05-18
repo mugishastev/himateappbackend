@@ -1,6 +1,6 @@
 import {
     Controller, Get, Post, Body, HttpCode, HttpStatus,
-    Patch, UseGuards, Request, ParseIntPipe, Query
+    Patch, UseGuards, Request, ParseIntPipe, Query, Ip
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -23,8 +23,8 @@ export class AuthController {
     @ApiOperation({ summary: 'Register a new user' })
     @ApiResponse({ status: 201, description: 'User successfully registered' })
     @ApiResponse({ status: 409, description: 'Email already exists' })
-    register(@Body() registerDto: RegisterDto) {
-        return this.authService.register(registerDto);
+    register(@Body() registerDto: RegisterDto, @Ip() ip: string) {
+        return this.authService.register(registerDto, ip);
     }
 
     /**
@@ -64,8 +64,8 @@ export class AuthController {
     @ApiOperation({ summary: 'User login' })
     @ApiResponse({ status: 200, description: 'Login successful, tokens returned' })
     @ApiResponse({ status: 401, description: 'Invalid credentials or unverified email' })
-    login(@Body() loginDto: LoginDto) {
-        return this.authService.login(loginDto);
+    login(@Body() loginDto: LoginDto, @Ip() ip: string) {
+        return this.authService.login(loginDto, ip);
     }
 
     /**
@@ -102,8 +102,8 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Reset password with OTP' })
     @ApiResponse({ status: 200, description: 'Password reset successful' })
-    resetPassword(@Body() dto: ResetPasswordDto) {
-        return this.authService.resetPassword(dto);
+    resetPassword(@Body() dto: ResetPasswordDto, @Ip() ip: string) {
+        return this.authService.resetPassword(dto, ip);
     }
 
     // ─── Protected Routes ─────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Log out user' })
     @ApiResponse({ status: 200, description: 'Logged out successfully' })
-    logout(@CurrentUser() user: any) {
-        return this.authService.logout(user.id);
+    logout(@CurrentUser() user: any, @Ip() ip: string) {
+        return this.authService.logout(user.id, ip);
     }
 }

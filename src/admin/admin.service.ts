@@ -390,6 +390,7 @@ export class AdminService {
             data: {
                 userId: id,
                 action: 'USER_BANNED',
+                category: 'admin',
                 details: `User suspended. Reason: ${reason}`
             }
         });
@@ -414,6 +415,7 @@ export class AdminService {
             data: {
                 userId: id,
                 action: 'USER_UNBANNED',
+                category: 'admin',
                 details: `User ban lifted.`
             }
         });
@@ -421,9 +423,25 @@ export class AdminService {
         return unbannedUser;
     }
 
-    async getAuditLogs(page = 1, limit = 30, action?: string) {
+    async getAuditLogs(page = 1, limit = 30, action?: string, category?: string, search?: string) {
         const skip = (page - 1) * limit;
-        const where = action ? { action } : {};
+        const where: any = {};
+        
+        if (action) {
+            where.action = action;
+        }
+        if (category && category !== 'all') {
+            where.category = category;
+        }
+        if (search) {
+            where.OR = [
+                { action: { contains: search, mode: 'insensitive' as const } },
+                { details: { contains: search, mode: 'insensitive' as const } },
+                { ipAddress: { contains: search, mode: 'insensitive' as const } },
+                { user: { username: { contains: search, mode: 'insensitive' as const } } },
+                { user: { email: { contains: search, mode: 'insensitive' as const } } },
+            ];
+        }
 
         const [data, total] = await Promise.all([
             this.prisma.auditLog.findMany({

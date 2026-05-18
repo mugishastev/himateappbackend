@@ -99,8 +99,10 @@ export class AdminController {
         @Query('page') page = '1',
         @Query('limit') limit = '30',
         @Query('action') action?: string,
+        @Query('category') category?: string,
+        @Query('search') search?: string,
     ) {
-        return this.adminService.getAuditLogs(+page, +limit, action);
+        return this.adminService.getAuditLogs(+page, +limit, action, category, search);
     }
 
     @Post('broadcast')
@@ -119,4 +121,3 @@ export class AdminController {
         return this.adminService.getBroadcastHistory();
     }
 }
-

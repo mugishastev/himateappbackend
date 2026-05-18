@@ -195,12 +195,15 @@ model Setting {
 }
 
 model AuditLog {
-  id        Int      @id @default(autoincrement())
-  userId    Int?
-  action    String
-  details   String?
-  createdAt DateTime @default(now())
-  user      User?    @relation(fields: [userId], references: [id])
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  targetId   Int?
+  action     String
+  category   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
 }
 
 model Page {

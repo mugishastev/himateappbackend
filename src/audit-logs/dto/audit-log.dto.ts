@@ -5,10 +5,22 @@ export class CreateAuditLogDto {
     @IsInt()
     userId?: number;
 
+    @IsOptional()
+    @IsInt()
+    targetId?: number;
+
     @IsString()
     action: string;
 
     @IsOptional()
     @IsString()
+    category?: string;
+
+    @IsOptional()
+    @IsString()
     details?: string;
+
+    @IsOptional()
+    @IsString()
+    ipAddress?: string;
 }

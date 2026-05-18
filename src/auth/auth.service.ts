@@ -25,14 +25,51 @@ export class AuthService {
 
     // ─── Register ────────────────────────────────────────────────────────────
 
-    async register(registerDto: RegisterDto) {
+    async register(registerDto: RegisterDto, ip?: string) {
         const { email, password, username, phoneNumber } = registerDto;
 
+        // 1. IP Address Protection (Prevent multiple accounts from same network)
+        if (ip && ip !== '127.0.0.1' && ip !== '::1') {
+            const previousRegistrations = await this.prisma.auditLog.findMany({
+                where: {
+                    action: 'ACCOUNT_CREATED',
+                    ipAddress: ip,
+                },
+                include: {
+                    user: true,
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            });
+
+            // Find if there is an active verified user already created from this IP
+            const activeUsers = previousRegistrations
+                .map(log => log.user)
+                .filter(u => u && u.isVerified && !u.isBanned);
+
+            if (activeUsers.length >= 1) {
+                const existingEmail = activeUsers[0].email;
+                // Mask the email for privacy protection (e.g. j***e@domain.com)
+                const parts = existingEmail.split('@');
+                const maskedEmail = parts[0].length > 2
+                    ? `${parts[0].slice(0, 2)}***${parts[0].slice(-1)}@${parts[1]}`
+                    : `***@${parts[1]}`;
+
+                throw new BadRequestException(
+                    `To prevent abuse and protect platform security, Himate limits the number of accounts created from the same network. We detected an existing account (${maskedEmail}) associated with your connection. Please use the "Forgot Password" or recovery option to access your existing account instead of creating a new one.`
+                );
+            }
+        }
+
+        // 2. Email Verification Check
         const existingUser = await this.prisma.user.findUnique({ where: { email } });
         
         if (existingUser) {
             if (existingUser.isVerified) {
-                throw new ConflictException('Email already exists');
+                throw new ConflictException(
+                    `This email address (${email}) is already registered and verified on Himate. If this is your account, please recover it using the "Forgot Password" option to reset your password or backup your credentials.`
+                );
             } else {
                 // User started registration but didn't verify. Resend OTP.
                 await this.sendOtp(email, 'VERIFY_EMAIL');
@@ -41,6 +78,22 @@ export class AuthService {
                     userId: existingUser.id,
                     email: existingUser.email,
                 };
+            }
+        }
+
+        // 3. Phone Number Verification Check
+        if (phoneNumber) {
+            const existingPhoneUser = await this.prisma.user.findFirst({
+                where: {
+                    phoneNumber,
+                    isVerified: true,
+                },
+            });
+
+            if (existingPhoneUser) {
+                throw new ConflictException(
+                    `This phone number is already linked to an active, verified account on Himate. To protect your data, we do not allow multiple accounts with the same number. Please use the "Forgot Password" page to recover the account associated with this phone number.`
+                );
             }
         }
 
@@ -60,6 +113,17 @@ export class AuthService {
                 isVerified: false,
                 roleId: userRole.id
             },
+        });
+
+        // Log audit
+        await this.prisma.auditLog.create({
+            data: {
+                userId: user.id,
+                action: 'ACCOUNT_CREATED',
+                category: 'session',
+                details: `User ${user.email} registered account`,
+                ipAddress: ip,
+            }
         });
 
         // Generate + send verification OTP
@@ -119,7 +183,7 @@ export class AuthService {
 
     // ─── Login ────────────────────────────────────────────────────────────────
 
-    async login(loginDto: LoginDto) {
+    async login(loginDto: LoginDto, ip?: string) {
         const { email, password } = loginDto;
         console.log(`[LOGIN-DEBUG] Attempting login for: ${email}`);
 
@@ -129,27 +193,72 @@ export class AuthService {
         });
         console.log(`[LOGIN-DEBUG] User found:`, user ? { id: user.id, email: user.email, hasPassword: !!user.password, isVerified: user.isVerified, roleId: user.roleId } : 'No user found');
 
-        if (!user || !user.password) throw new UnauthorizedException('Invalid credentials');
+        if (!user || !user.password) {
+            await this.prisma.auditLog.create({
+                data: {
+                    action: 'LOGIN_FAILED',
+                    category: 'high-risk',
+                    details: `Failed login attempt for non-existent email: ${email}`,
+                    ipAddress: ip,
+                }
+            });
+            throw new UnauthorizedException('Invalid credentials');
+        }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         console.log(`[LOGIN-DEBUG] Password valid: ${isPasswordValid}`);
 
-        if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials');
+        if (!isPasswordValid) {
+            await this.prisma.auditLog.create({
+                data: {
+                    userId: user.id,
+                    action: 'LOGIN_FAILED',
+                    category: 'high-risk',
+                    details: `Failed login attempt (invalid password) for user: ${email}`,
+                    ipAddress: ip,
+                }
+            });
+            throw new UnauthorizedException('Invalid credentials');
+        }
 
         if (!user.isVerified) {
             console.log(`[LOGIN-DEBUG] User not verified!`);
+            await this.prisma.auditLog.create({
+                data: {
+                    userId: user.id,
+                    action: 'LOGIN_FAILED',
+                    category: 'high-risk',
+                    details: `Attempted login on unverified account for user: ${email}`,
+                    ipAddress: ip,
+                }
+            });
             throw new UnauthorizedException('Please verify your email before logging in');
         }
 
         if (user.isBanned) {
             console.log(`[LOGIN-DEBUG] User is banned!`);
+            await this.prisma.auditLog.create({
+                data: {
+                    userId: user.id,
+                    action: 'LOGIN_FAILED',
+                    category: 'high-risk',
+                    details: `Attempted login on suspended account for user: ${email}. Reason: ${user.banReason}`,
+                    ipAddress: ip,
+                }
+            });
             throw new ForbiddenException(user.banReason || 'You have been suspended from the platform.');
         }
 
         // Log audit and update lastSeen
         await Promise.all([
             this.prisma.auditLog.create({
-                data: { userId: user.id, action: 'LOGIN', details: `User ${user.email} logged in` },
+                data: { 
+                    userId: user.id, 
+                    action: 'LOGIN', 
+                    category: 'session',
+                    details: `User ${user.email} logged in`,
+                    ipAddress: ip,
+                },
             }),
             this.prisma.user.update({
                 where: { id: user.id },
@@ -171,13 +280,19 @@ export class AuthService {
 
     // ─── Logout ───────────────────────────────────────────────────────────────
 
-    async logout(userId: number) {
+    async logout(userId: number, ip?: string) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (!user) throw new NotFoundException('User not found');
 
         // Log audit
         await this.prisma.auditLog.create({
-            data: { userId, action: 'LOGOUT', details: `User ${user.email} logged out` },
+            data: { 
+                userId, 
+                action: 'LOGOUT', 
+                category: 'session',
+                details: `User ${user.email} logged out`,
+                ipAddress: ip,
+            },
         });
 
         return { message: 'Logged out successfully.' };
@@ -206,7 +321,7 @@ export class AuthService {
 
     // ─── Reset Password ───────────────────────────────────────────────────────
 
-    async resetPassword(dto: ResetPasswordDto) {
+    async resetPassword(dto: ResetPasswordDto, ip?: string) {
         await this.validateOtp(dto.email, dto.otp, 'RESET_PASSWORD');
 
         const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
@@ -219,7 +334,13 @@ export class AuthService {
         const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
         if (user) {
             await this.prisma.auditLog.create({
-                data: { userId: user.id, action: 'RESET_PASSWORD', details: `Password reset for ${dto.email}` },
+                data: { 
+                    userId: user.id, 
+                    action: 'RESET_PASSWORD', 
+                    category: 'session',
+                    details: `Password reset for ${dto.email}`,
+                    ipAddress: ip,
+                },
             });
         }
 
