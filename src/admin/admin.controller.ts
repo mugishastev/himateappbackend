@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Query, UseGuards, Param, Body, ParseIntPipe, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Query, UseGuards, Param, Body, ParseIntPipe, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminService } from './admin.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -119,5 +120,49 @@ export class AdminController {
     @ApiOperation({ summary: 'Get broadcast history' })
     getBroadcastHistory() {
         return this.adminService.getBroadcastHistory();
+    }
+
+    @Get('settings')
+    @ApiOperation({ summary: 'Get all platform settings' })
+    getSettings() {
+        return this.adminService.getSettings();
+    }
+
+    @Patch('settings')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Update a platform setting key-value pair' })
+    updateSetting(
+        @CurrentUser() user: any,
+        @Body('key') key: string,
+        @Body('value') value: string,
+    ) {
+        return this.adminService.updateSetting(user.id, key, value);
+    }
+
+    @Delete('messages/:id')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Delete message system-wide' })
+    deleteMessage(
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return this.adminService.deleteMessage(id);
+    }
+
+    @Post('conversations/:id/freeze')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Freeze a conversation' })
+    freezeConversation(
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return this.adminService.freezeConversation(id);
+    }
+
+    @Post('conversations/:id/terminate')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Force terminate active call sessions in a conversation' })
+    terminateConversation(
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return this.adminService.terminateConversationSessions(id);
     }
 }

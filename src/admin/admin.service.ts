@@ -2,13 +2,24 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { Redis } from 'ioredis';
+import { MailService } from '../utils/mail.service';
 
 @Injectable()
 export class AdminService {
+    private redisClient: Redis;
+
     constructor(
         private prisma: PrismaService,
         private chatGateway: ChatGateway,
-    ) { }
+        private mailService: MailService,
+    ) {
+        this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+            connectTimeout: 15000,
+            maxRetriesPerRequest: null,
+            retryStrategy: (times) => Math.min(times * 100, 3000),
+        });
+        this.redisClient.on('error', (err) => console.error('[AdminService] Redis error:', err));
+    }
 
     async getHealth() {
         const result: any = {
@@ -53,86 +64,85 @@ export class AdminService {
         const startOf30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
         const [
-            totalUsers,
-            newUsersToday,
-            newUsersThisWeek,
-            verifiedUsers,
-            unverifiedUsers,
-            bannedUsers,
-            active24h,
-            active7d,
-            active30d,
-            totalConversations,
-            groupConversations,
-            dmConversations,
-            totalMessages,
-            messagesToday,
-            deletedMessages,
-            imageMessages,
-            audioMessages,
-            videoMessages,
-            fileMessages,
-            notificationsToday,
-            notificationsWeek,
-            broadcastsTotal,
-            bansToday,
-            pendingInboxConversations,
-            avgResponseTimeMinutes,
-            pageInboxSize,
-            failedNotificationsToday,
+            totalUsers,                  // 0
+            newUsersToday,              // 1
+            newUsersThisWeek,           // 2
+            verifiedUsers,              // 3
+            unverifiedUsers,            // 4
+            bannedUsers,                // 5
+            active24h,                  // 6
+            active7d,                   // 7
+            active30d,                  // 8
+            totalConversations,         // 9
+            groupConversations,         // 10
+            dmConversations,            // 11
+            totalMessages,              // 12
+            messagesToday,              // 13
+            deletedMessages,            // 14
+            imageMessages,              // 15
+            audioMessages,              // 16
+            videoMessages,              // 17
+            fileMessages,               // 18
+            notificationsToday,         // 19
+            notificationsWeek,          // 20
+            broadcastsTotal,            // 21
+            bansToday,                  // 22
+            failedNotificationsToday,   // 23
+            pendingInboxConversations,  // 24
+            avgResponseTimeMinutes,     // 25
+            pageInboxSize,              // 26
+            activeCallsCount,           // 27
         ] = await Promise.all([
-            this.prisma.user.count(),
-            this.prisma.user.count({ where: { createdAt: { gte: startOfToday } } }),
-            this.prisma.user.count({ where: { createdAt: { gte: startOfWeek } } }),
-            this.prisma.user.count({ where: { isVerified: true } }),
-            this.prisma.user.count({ where: { isVerified: false } }),
-            this.prisma.user.count({ where: { isBanned: true } }),
-            this.prisma.user.count({ where: { lastSeen: { gte: startOf24h } } }),
-            this.prisma.user.count({ where: { lastSeen: { gte: startOf7d } } }),
-            this.prisma.user.count({ where: { lastSeen: { gte: startOf30d } } }),
-            this.prisma.conversation.count(),
-            this.prisma.conversation.count({ where: { isGroup: true } }),
-            this.prisma.conversation.count({ where: { isGroup: false } }),
-            this.prisma.message.count({ where: { isDeleted: false } }),
+            this.prisma.user.count(),                                                      // 0
+            this.prisma.user.count({ where: { createdAt: { gte: startOfToday } } }),       // 1
+            this.prisma.user.count({ where: { createdAt: { gte: startOfWeek } } }),        // 2
+            this.prisma.user.count({ where: { isVerified: true } }),                       // 3
+            this.prisma.user.count({ where: { isVerified: false } }),                      // 4
+            this.prisma.user.count({ where: { isBanned: true } }),                         // 5
+            this.prisma.user.count({ where: { lastSeen: { gte: startOf24h } } }),          // 6
+            this.prisma.user.count({ where: { lastSeen: { gte: startOf7d } } }),           // 7
+            this.prisma.user.count({ where: { lastSeen: { gte: startOf30d } } }),          // 8
+            this.prisma.conversation.count(),                                              // 9
+            this.prisma.conversation.count({ where: { isGroup: true } }),                  // 10
+            this.prisma.conversation.count({ where: { isGroup: false } }),                 // 11
+            this.prisma.message.count({ where: { isDeleted: false } }),                    // 12
             // Message uses "timestamp" field, not "createdAt"
-            this.prisma.message.count({ where: { timestamp: { gte: startOfToday }, isDeleted: false } }),
-            this.prisma.message.count({ where: { isDeleted: true } }),
-            this.prisma.message.count({ where: { type: 'IMAGE', isDeleted: false } }),
-            this.prisma.message.count({ where: { type: 'AUDIO', isDeleted: false } }),
-            this.prisma.message.count({ where: { type: 'VIDEO', isDeleted: false } }),
-            this.prisma.message.count({ where: { type: 'FILE', isDeleted: false } }),
-            this.prisma.notification.count({ where: { createdAt: { gte: startOfToday } } }),
-            this.prisma.notification.count({ where: { createdAt: { gte: startOfWeek } } }),
-            this.prisma.notification.count({ where: { type: 'BROADCAST' } }),
-            this.prisma.auditLog.count({
+            this.prisma.message.count({ where: { timestamp: { gte: startOfToday }, isDeleted: false } }), // 13
+            this.prisma.message.count({ where: { isDeleted: true } }),                     // 14
+            this.prisma.message.count({ where: { type: 'IMAGE', isDeleted: false } }),     // 15
+            this.prisma.message.count({ where: { type: 'AUDIO', isDeleted: false } }),     // 16
+            this.prisma.message.count({ where: { type: 'VIDEO', isDeleted: false } }),     // 17
+            this.prisma.message.count({ where: { type: 'FILE', isDeleted: false } }),      // 18
+            this.prisma.notification.count({ where: { createdAt: { gte: startOfToday } } }), // 19
+            this.prisma.notification.count({ where: { createdAt: { gte: startOfWeek } } }),  // 20
+            this.prisma.notification.count({ where: { type: 'BROADCAST' } }),              // 21
+            this.prisma.auditLog.count({                                                   // 22
                 where: {
                     action: 'USER_BANNED',
                     createdAt: { gte: startOfToday },
                 },
             }),
-            this.prisma.notification.count({
+            this.prisma.notification.count({                                               // 23
                 where: {
                     createdAt: { gte: startOfToday },
                     deliveryStatus: 'FAILED',
                 },
             }),
-            // Conversations with no messages (inbox waiting)
-            this.prisma.conversation.count({
+            this.prisma.conversation.count({                                               // 24
                 where: { messages: { none: {} } },
             }),
-            // Rough average response time: avg time between first two messages in a conversation
-            this.prisma.$queryRaw<
-                { avg_minutes: number | null }[]
-            >`SELECT AVG(EXTRACT(EPOCH FROM (m2."timestamp" - m1."timestamp")) / 60.0) AS avg_minutes
+            this.prisma.$queryRaw<{ avg_minutes: number | null }[]>`SELECT AVG(EXTRACT(EPOCH FROM (m2."timestamp" - m1."timestamp")) / 60.0) AS avg_minutes
               FROM "Message" m1
               JOIN "Message" m2 ON m2."conversationId" = m1."conversationId"
-              WHERE m2.id = (
-                SELECT MIN(m3.id)
-                FROM "Message" m3
-                WHERE m3."conversationId" = m1."conversationId" AND m3.id > m1.id
-              )`,
-            // Page inbox size: number of conversations linked to pages
-            this.prisma.conversation.count({ where: { pageId: { not: null } } }),
+              WHERE m1."timestamp" >= NOW() - INTERVAL '48 hours'
+                AND m2.id = (
+                  SELECT MIN(m3.id)
+                  FROM "Message" m3
+                  WHERE m3."conversationId" = m1."conversationId" AND m3.id > m1.id
+                )
+                AND EXTRACT(EPOCH FROM (m2."timestamp" - m1."timestamp")) / 60.0 <= 180.0`,
+            this.prisma.conversation.count({ where: { pageId: { not: null } } }),          // 26
+            this.prisma.call.count({ where: { endedAt: null } }),                          // 27
         ]);
 
         // Last 7 days activity (messages per day) — using "timestamp" field
@@ -165,6 +175,59 @@ export class AdminService {
                 role: { select: { name: true } },
             },
         });
+
+        // Recent user reports (moderation queue)
+        const recentReports = await this.prisma.auditLog.findMany({
+            where: { action: 'USER_REPORTED' },
+            take: 5,
+            orderBy: { createdAt: 'desc' },
+            include: { user: true }
+        });
+
+        const reportsWithTargets = await Promise.all(
+            recentReports.map(async (rep) => {
+                let targetUser = null;
+                if (rep.targetId) {
+                    targetUser = await this.prisma.user.findUnique({
+                        where: { id: rep.targetId },
+                        select: { id: true, username: true, email: true, profileImage: true }
+                    });
+                }
+                return {
+                    id: rep.id,
+                    reporter: rep.user ? { id: rep.user.id, username: rep.user.username, email: rep.user.email } : null,
+                    target: targetUser,
+                    reason: rep.details,
+                    createdAt: rep.createdAt
+                };
+            })
+        );
+
+        // Trending posts (page posts with views and reaction count)
+        const trendingPosts = await this.prisma.pagePost.findMany({
+            take: 5,
+            orderBy: { views: 'desc' },
+            include: {
+                page: {
+                    select: {
+                        id: true,
+                        name: true,
+                        handle: true,
+                        avatarUrl: true
+                    }
+                },
+                reactions: true
+            }
+        });
+
+        const formattedPosts = trendingPosts.map(p => ({
+            id: p.id,
+            content: p.content,
+            views: p.views,
+            createdAt: p.createdAt,
+            page: p.page,
+            reactionsCount: p.reactions.length
+        }));
 
         return {
             users: {
@@ -202,6 +265,9 @@ export class AdminService {
                 avgResponseTimeMinutes: avgResponseTimeMinutes?.[0]?.avg_minutes ?? null,
                 pageInboxConversations: pageInboxSize,
             },
+            activeCallsCount,
+            recentReports: reportsWithTargets,
+            trendingPosts: formattedPosts,
             weeklyActivity,
             recentUsers: recentUsers.map((u) => ({ ...u, isAdmin: u.role?.name === 'ADMIN' })),
         };
@@ -420,6 +486,13 @@ export class AdminService {
             }
         });
 
+        // Send a beautifully styled unban email to the restored user
+        try {
+            await this.mailService.sendUnbanNotificationEmail(unbannedUser.email, unbannedUser.username);
+        } catch (mailError) {
+            console.error('Failed to send unban notification email', mailError);
+        }
+
         return unbannedUser;
     }
 
@@ -507,5 +580,130 @@ export class AdminService {
             orderBy: { createdAt: 'desc' },
             take: 20,
         });
+    }
+
+    async getSettings() {
+        const settings = await this.prisma.setting.findMany();
+        
+        // Define default settings
+        const defaults: Record<string, string> = {
+            platform_name: 'Himate',
+            support_email: 'support@himate.com',
+            maintenance_message: "We'll be right back.",
+            maintenance_mode: 'false',
+            require_verification: 'true',
+            public_registration: 'true',
+            rate_limiting: 'false',
+        };
+
+        // Merge DB settings over defaults
+        const result = { ...defaults };
+        for (const s of settings) {
+            result[s.key] = s.value;
+        }
+
+        return result;
+    }
+
+    async updateSetting(adminId: number, key: string, value: string) {
+        const existing = await this.prisma.setting.findFirst({
+            where: { key }
+        });
+
+        let setting;
+        if (existing) {
+            setting = await this.prisma.setting.update({
+                where: { id: existing.id },
+                data: { value, userId: adminId }
+            });
+        } else {
+            setting = await this.prisma.setting.create({
+                data: {
+                    key,
+                    value,
+                    userId: adminId
+                }
+            });
+        }
+
+        // Sync to Redis immediately for fast system-wide middleware lookups!
+        await this.redisClient.set(`system_config:${key}`, value);
+
+        return setting;
+    }
+
+    async deleteMessage(messageId: number) {
+        const msg = await this.prisma.message.findUnique({ where: { id: messageId } });
+        if (!msg) {
+            throw new NotFoundException('Message not found');
+        }
+        await this.prisma.message.update({
+            where: { id: messageId },
+            data: { isDeleted: true },
+        });
+
+        // Audit Log
+        await this.prisma.auditLog.create({
+            data: {
+                action: 'MESSAGE_DELETED_SYSTEM_WIDE',
+                targetId: messageId,
+                details: `Message ID ${messageId} deleted system-wide by admin`,
+            },
+        });
+
+        return { success: true };
+    }
+
+    async freezeConversation(conversationId: number) {
+        const conv = await this.prisma.conversation.findUnique({ where: { id: conversationId } });
+        if (!conv) {
+            throw new NotFoundException('Conversation not found');
+        }
+
+        // Audit Log
+        await this.prisma.auditLog.create({
+            data: {
+                action: 'CONVERSATION_FROZEN',
+                targetId: conversationId,
+                details: `Conversation ID ${conversationId} frozen by admin`,
+            },
+        });
+
+        return { success: true };
+    }
+
+    async terminateConversationSessions(conversationId: number) {
+        const conv = await this.prisma.conversation.findUnique({
+            where: { id: conversationId },
+            include: { participants: true },
+        });
+        if (!conv) {
+            throw new NotFoundException('Conversation not found');
+        }
+
+        const userIds = conv.participants.map((p) => p.userId);
+        
+        // Terminate any active calls associated with participants
+        const activeCalls = await this.prisma.call.updateMany({
+            where: {
+                endedAt: null,
+                OR: [
+                    { callerId: { in: userIds } },
+                    { receiverId: { in: userIds } },
+                ],
+            },
+            data: { endedAt: new Date() },
+        });
+
+        // Audit Log
+        await this.prisma.auditLog.create({
+            data: {
+                action: 'CONVERSATION_SESSIONS_TERMINATED',
+                targetId: conversationId,
+                details: `Terminated ${activeCalls.count} active WebRTC calls for conversation ID ${conversationId}`,
+            },
+        });
+
+        return { success: true, count: activeCalls.count };
     }
 }

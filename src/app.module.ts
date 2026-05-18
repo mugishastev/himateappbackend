@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from './config/env.validation';
 import { APP_GUARD } from '@nestjs/core';
@@ -17,6 +17,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { SettingsModule } from './settings/settings.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AdminModule } from './admin/admin.module';
+import { SystemConfigMiddleware } from './common/middleware/system-config.middleware';
 
 import { UtilsModule } from './utils/utils.module';
 import { AuthModule } from './auth/auth.module';
@@ -66,4 +67,10 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     },
   ],
 })
-export class AppModule { }
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(SystemConfigMiddleware)
+      .forRoutes('*');
+  }
+}

@@ -134,4 +134,16 @@ export class AuthController {
     logout(@CurrentUser() user: any, @Ip() ip: string) {
         return this.authService.logout(user.id, ip);
     }
+
+    @Post('appeal')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Submit a suspension appeal for an account' })
+    @ApiResponse({ status: 200, description: 'Appeal submitted' })
+    submitAppeal(
+        @Body('email') email: string,
+        @Body('statement') statement: string,
+        @Ip() ip: string,
+    ) {
+        return this.authService.submitAppeal(email, statement, ip);
+    }
 }

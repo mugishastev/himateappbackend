@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UseFilters, UsePipes, ValidationPipe, Inject, forwardRef } from '@nestjs/common';
 
 import { FcmService } from '../notifications/fcm.service';
+import { Redis } from 'ioredis';
 
 @WebSocketGateway({
     cors: {
@@ -24,12 +25,21 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     @WebSocketServer()
     server: Server;
 
+    private redisClient: Redis;
+
     constructor(
         private jwtService: JwtService,
         private prisma: PrismaService,
         @Inject(forwardRef(() => FcmService))
         private fcmService: FcmService,
-    ) { }
+    ) {
+        this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+            connectTimeout: 15000,
+            maxRetriesPerRequest: null,
+            retryStrategy: (times) => Math.min(times * 100, 3000),
+        });
+        this.redisClient.on('error', (err) => console.error('[ChatGateway] Redis error:', err));
+    }
 
     afterInit(server: Server) {
         console.log('Chat Gateway Initialized');
@@ -45,6 +55,35 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
             }
 
             const payload = this.jwtService.verify(token);
+
+            // ─── CHECK MAINTENANCE MODE FOR SOCKET CONNECTION ─────────────
+            let maintenanceMode = await this.redisClient.get('system_config:maintenance_mode');
+            if (!maintenanceMode) {
+                const dbSetting = await this.prisma.setting.findFirst({ where: { key: 'maintenance_mode' } });
+                maintenanceMode = dbSetting ? dbSetting.value : 'false';
+                await this.redisClient.set('system_config:maintenance_mode', maintenanceMode);
+            }
+
+            if (maintenanceMode === 'true') {
+                const user = await this.prisma.user.findUnique({
+                    where: { id: payload.sub },
+                    include: { role: true },
+                });
+                const isAdmin = user?.role?.name === 'ADMIN';
+
+                if (!isAdmin) {
+                    let maintenanceMessage = await this.redisClient.get('system_config:maintenance_message');
+                    if (!maintenanceMessage) {
+                        const dbMsg = await this.prisma.setting.findFirst({ where: { key: 'maintenance_message' } });
+                        maintenanceMessage = dbMsg ? dbMsg.value : "We'll be right back.";
+                    }
+                    console.log(`[ChatGateway] Disconnecting non-admin ${payload.sub} due to Maintenance Mode`);
+                    client.emit('maintenance', { message: maintenanceMessage });
+                    client.disconnect();
+                    return;
+                }
+            }
+
             client.data.userId = payload.sub;
 
             console.log(`User connected: ${payload.sub}`);

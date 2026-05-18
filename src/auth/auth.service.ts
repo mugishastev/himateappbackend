@@ -28,6 +28,18 @@ export class AuthService {
     async register(registerDto: RegisterDto, ip?: string) {
         const { email, password, username, phoneNumber } = registerDto;
 
+        // 0. Public Registration Enforcement Check
+        let publicRegistration = await this.redisClient.get('system_config:public_registration');
+        if (!publicRegistration) {
+            const dbSetting = await this.prisma.setting.findFirst({ where: { key: 'public_registration' } });
+            publicRegistration = dbSetting ? dbSetting.value : 'true';
+            await this.redisClient.set('system_config:public_registration', publicRegistration);
+        }
+
+        if (publicRegistration === 'false') {
+            throw new ForbiddenException('Registration is temporarily disabled by the administrator.');
+        }
+
         // 1. IP Address Protection (Prevent multiple accounts from same network)
         if (ip && ip !== '127.0.0.1' && ip !== '::1') {
             const previousRegistrations = await this.prisma.auditLog.findMany({
@@ -221,7 +233,15 @@ export class AuthService {
             throw new UnauthorizedException('Invalid credentials');
         }
 
-        if (!user.isVerified) {
+        // Check if user verification is required
+        let requireVerification = await this.redisClient.get('system_config:require_verification');
+        if (!requireVerification) {
+            const dbSetting = await this.prisma.setting.findFirst({ where: { key: 'require_verification' } });
+            requireVerification = dbSetting ? dbSetting.value : 'true';
+            await this.redisClient.set('system_config:require_verification', requireVerification);
+        }
+
+        if (requireVerification === 'true' && !user.isVerified) {
             console.log(`[LOGIN-DEBUG] User not verified!`);
             await this.prisma.auditLog.create({
                 data: {
@@ -422,5 +442,46 @@ export class AuthService {
         }
 
         await this.redisClient.del(key);
+    }
+
+    async submitAppeal(email: string, statement: string, ip: string) {
+        if (!email || !statement || !statement.trim()) {
+            throw new BadRequestException('Email and appeal statement are required');
+        }
+
+        const user = await this.prisma.user.findUnique({ where: { email } });
+        if (!user) {
+            throw new NotFoundException('No registered account was found with this email');
+        }
+
+        if (!user.isBanned) {
+            throw new BadRequestException('This account is not currently suspended');
+        }
+
+        // Create an audit log record of type 'USER_REPORTED'
+        // This will be fetched on the admin's 'Reported Content' page!
+        const auditLog = await this.prisma.auditLog.create({
+            data: {
+                userId: user.id,
+                action: 'USER_REPORTED', // Make sure it hits the USER_REPORTED filter on the Flags page!
+                category: 'moderation',
+                details: `SUSPENSION APPEAL BY ${email}: "${statement.trim()}"`,
+                ipAddress: ip,
+                targetId: user.id, // target is the user appealing
+            },
+        });
+
+        // Send a beautifully styled appeal confirmation email to the user's Gmail
+        try {
+            await this.mailService.sendAppealConfirmationEmail(email, user.username);
+        } catch (mailError) {
+            console.error('Failed to send appeal confirmation email', mailError);
+        }
+
+        return {
+            success: true,
+            ticketId: auditLog.id,
+            message: 'Your appeal has been successfully filed with Himate Safety Administrators.',
+        };
     }
 }
