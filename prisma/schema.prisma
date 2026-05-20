@@ -7,56 +7,55 @@ datasource db {
 }
 
 model User {
-  id                Int                       @id @default(autoincrement())
-  email             String                    @unique
-  isVerified        Boolean                   @default(false)
-  username          String?
-  phoneNumber       String?                   @unique
-  password          String?
-  profileImage      String?
-  fcmToken          String?
-  lastSeen          DateTime?                 @default(now())
-  roleId            Int?
-  createdAt         DateTime                  @default(now())
-  bio               String?
-  banReason         String?
-  isBanned          Boolean                   @default(false)
-  deactivatedAt     DateTime?
-  auditLogs         AuditLog[]
-  blockedBy         BlockedUser[]             @relation("UserBlocked")
-  blockedUsers      BlockedUser[]             @relation("UserBlocking")
-  calls             Call[]                    @relation("UserCalls")
-  receivedCalls     Call[]                    @relation("UserReceivedCalls")
-  contactOf         Contact[]                 @relation("UserContactOf")
-  contacts          Contact[]                 @relation("UserContacts")
-  conversations     ConversationParticipant[]
-  messages          Message[]                 @relation("UserMessages")
-  notifications     Notification[]
-  pages             Page[]                    @relation("UserPages")
-  followedPages     PageFollower[]            @relation("UserFollowedPages")
-  postReactions     PostReaction[]            @relation("UserPostReactions")
-  scheduledCalls    ScheduledCall[]           @relation("ScheduledCaller")
-  scheduledReceived ScheduledCall[]           @relation("ScheduledReceiver")
-  settings          Setting[]
-  statuses          Status[]
-  role              Role?                     @relation(fields: [roleId], references: [id])
-
-  // Preferences / Settings
-  theme             String                    @default("Dark")
-  showLastSeen      Boolean                   @default(true)
-  showProfilePhoto  Boolean                   @default(true)
-  readReceipts      Boolean                   @default(true)
-  messageNotifs     Boolean                   @default(true)
-  soundEnabled      Boolean                   @default(true)
-  desktopNotifs     Boolean                   @default(true)
-  twoStepEnabled    Boolean                   @default(false)
-  twoStepSecret     String?
-  enterToSend       Boolean                   @default(true)
-  chatWallpaper     String?
-  wallpaperOpacity  Int                       @default(100)
-  autoDownloadPhotos Boolean                  @default(true)
-  autoDownloadVideos Boolean                  @default(false)
-  autoDownloadDocs   Boolean                  @default(true)
+  id                 Int                       @id @default(autoincrement())
+  email              String                    @unique
+  isVerified         Boolean                   @default(false)
+  username           String?
+  phoneNumber        String?                   @unique
+  password           String?
+  profileImage       String?
+  fcmToken           String?
+  lastSeen           DateTime?                 @default(now())
+  roleId             Int?
+  createdAt          DateTime                  @default(now())
+  bio                String?
+  banReason          String?
+  isBanned           Boolean                   @default(false)
+  chatWallpaper      String?
+  desktopNotifs      Boolean                   @default(true)
+  enterToSend        Boolean                   @default(true)
+  messageNotifs      Boolean                   @default(true)
+  readReceipts       Boolean                   @default(true)
+  showLastSeen       Boolean                   @default(true)
+  showProfilePhoto   Boolean                   @default(true)
+  soundEnabled       Boolean                   @default(true)
+  theme              String                    @default("Dark")
+  twoStepEnabled     Boolean                   @default(false)
+  wallpaperOpacity   Int                       @default(100)
+  twoStepSecret      String?
+  autoDownloadDocs   Boolean                   @default(true)
+  autoDownloadPhotos Boolean                   @default(true)
+  autoDownloadVideos Boolean                   @default(false)
+  deactivatedAt      DateTime?
+  auditLogs          AuditLog[]
+  blockedBy          BlockedUser[]             @relation("UserBlocked")
+  blockedUsers       BlockedUser[]             @relation("UserBlocking")
+  calls              Call[]                    @relation("UserCalls")
+  receivedCalls      Call[]                    @relation("UserReceivedCalls")
+  contactOf          Contact[]                 @relation("UserContactOf")
+  contacts           Contact[]                 @relation("UserContacts")
+  conversations      ConversationParticipant[]
+  messages           Message[]                 @relation("UserMessages")
+  notifications      Notification[]
+  pages              Page[]                    @relation("UserPages")
+  followedPages      PageFollower[]            @relation("UserFollowedPages")
+  postReactions      PostReaction[]            @relation("UserPostReactions")
+  scheduledCalls     ScheduledCall[]           @relation("ScheduledCaller")
+  scheduledReceived  ScheduledCall[]           @relation("ScheduledReceiver")
+  settings           Setting[]
+  statuses           Status[]
+  statusViews        StatusView[]              @relation("UserStatusViews")
+  role               Role?                     @relation(fields: [roleId], references: [id])
 }
 
 model BlockedUser {
@@ -147,13 +146,26 @@ model Attachment {
 }
 
 model Status {
-  id        Int      @id @default(autoincrement())
+  id        Int          @id @default(autoincrement())
   userId    Int
   content   String
   mediaUrl  String?
   expiresAt DateTime
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id])
+  views     StatusView[]
+}
+
+model StatusView {
+  id        Int      @id @default(autoincrement())
+  statusId  Int
+  userId    Int
+  viewedAt  DateTime @default(now())
+
+  status    Status   @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserStatusViews", fields: [userId], references: [id])
+
+  @@unique([statusId, userId])
 }
 
 model Call {
@@ -179,16 +191,16 @@ model ScheduledCall {
 }
 
 model Notification {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  type      String
-  content   String
-  isRead    Boolean  @default(false)
-  deliveryStatus String @default("SENT")
-  deliveredAt DateTime?
-  deliveryError String?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  id             Int       @id @default(autoincrement())
+  userId         Int
+  type           String
+  content        String
+  isRead         Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  deliveredAt    DateTime?
+  deliveryError  String?
+  deliveryStatus String    @default("SENT")
+  user           User      @relation(fields: [userId], references: [id])
 }
 
 model Setting {
@@ -200,15 +212,15 @@ model Setting {
 }
 
 model AuditLog {
-  id         Int      @id @default(autoincrement())
-  userId     Int?
-  targetId   Int?
-  action     String
-  category   String?
-  details    String?
-  ipAddress  String?
-  createdAt  DateTime @default(now())
-  user       User?    @relation(fields: [userId], references: [id])
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+  category  String?
+  ipAddress String?
+  targetId  Int?
+  user      User?    @relation(fields: [userId], references: [id])
 }
 
 model Page {

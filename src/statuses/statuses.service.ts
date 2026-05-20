@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStatusDto, UpdateStatusDto } from './dto/status.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
 import { CloudinaryService } from '../utils/cloudinary.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class StatusesService {
@@ -107,5 +108,43 @@ export class StatusesService {
         return this.prisma.status.delete({
             where: { id },
         });
+    }
+
+    async viewStatus(id: number, userId: number) {
+        const status = await this.findOne(id);
+        if (status.userId === userId) return; // owner doesn't count as viewer
+        
+        await this.prisma.statusView.upsert({
+            where: { statusId_userId: { statusId: id, userId } },
+            create: { statusId: id, userId },
+            update: { viewedAt: new Date() }
+        });
+        return { success: true };
+    }
+
+    async getViews(id: number, currentUserId: number) {
+        const status = await this.findOne(id);
+        if (status.userId !== currentUserId) {
+            throw new UnauthorizedException('You can only see views of your own status');
+        }
+        return this.prisma.statusView.findMany({
+            where: { statusId: id },
+            include: { user: true },
+            orderBy: { viewedAt: 'desc' }
+        });
+    }
+
+    @Cron(CronExpression.EVERY_HOUR)
+    async handleCron() {
+        try {
+            const result = await this.prisma.status.deleteMany({
+                where: { expiresAt: { lt: new Date() } }
+            });
+            if (result.count > 0) {
+                Logger.log(`Deleted ${result.count} expired statuses`, 'StatusesService');
+            }
+        } catch (error) {
+            Logger.error('Failed to clean up expired statuses', error, 'StatusesService');
+        }
     }
 }

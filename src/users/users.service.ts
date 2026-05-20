@@ -67,13 +67,16 @@ export class UsersService {
     }
 
     async update(id: number, updateUserDto: UpdateUserDto) {
-        if (updateUserDto.password) {
-            updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+        const data = { ...updateUserDto };
+
+        if (data.password) {
+            data.password = await bcrypt.hash(data.password, 10);
         }
 
         return this.prisma.user.update({
             where: { id },
-            data: updateUserDto,
+            // Filter out fields that might exist in DTO but not in DB
+            data: data,
         });
     }
 
@@ -199,7 +202,7 @@ export class UsersService {
         return audits.map((a) => ({
             id: a.id.toString(),
             ipAddress: a.ipAddress || '127.0.0.1',
-            userAgent: a.details || 'Unknown Device', 
+            userAgent: a.details || 'Unknown Device',
             lastActive: a.createdAt,
         }));
     }
@@ -243,8 +246,12 @@ export class UsersService {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, twoStepSecret, ...sanitized } = user;
 
-        if (!sanitized.showLastSeen) sanitized.lastSeen = null;
-        if (!sanitized.showProfilePhoto) sanitized.profileImage = null;
+        // Explicitly check for privacy settings
+        if (sanitized.showLastSeen === false) sanitized.lastSeen = null;
+        if (sanitized.showProfilePhoto === false) sanitized.profileImage = null;
+
+        // Ensure IDs are numbers
+        if (sanitized.id) sanitized.id = Number(sanitized.id);
 
         return sanitized;
     }

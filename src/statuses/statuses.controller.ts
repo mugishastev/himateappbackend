@@ -84,4 +84,19 @@ export class StatusesController {
     ) {
         return this.statusesService.remove(id, user.id, user.role);
     }
+    @Post(':id/view')
+    viewStatus(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() user: any,
+    ) {
+        return this.statusesService.viewStatus(id, user.id);
+    }
+
+    @Get(':id/views')
+    getViews(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() user: any,
+    ) {
+        return this.statusesService.getViews(id, user.id);
+    }
 }
