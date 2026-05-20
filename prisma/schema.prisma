@@ -21,6 +21,7 @@ model User {
   bio               String?
   banReason         String?
   isBanned          Boolean                   @default(false)
+  deactivatedAt     DateTime?
   auditLogs         AuditLog[]
   blockedBy         BlockedUser[]             @relation("UserBlocked")
   blockedUsers      BlockedUser[]             @relation("UserBlocking")
@@ -49,9 +50,13 @@ model User {
   soundEnabled      Boolean                   @default(true)
   desktopNotifs     Boolean                   @default(true)
   twoStepEnabled    Boolean                   @default(false)
+  twoStepSecret     String?
   enterToSend       Boolean                   @default(true)
   chatWallpaper     String?
   wallpaperOpacity  Int                       @default(100)
+  autoDownloadPhotos Boolean                  @default(true)
+  autoDownloadVideos Boolean                  @default(false)
+  autoDownloadDocs   Boolean                  @default(true)
 }
 
 model BlockedUser {

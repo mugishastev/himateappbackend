@@ -124,11 +124,15 @@ export class UsersController {
         return this.usersService.unblockUser(currentUser.id, targetId);
     }
 
-    @Get('me/blocked')
+    @Get(':id/blocked')
     @ApiOperation({ summary: 'Get blocked users list' })
     @ApiResponse({ status: 200, description: 'List of blocked users' })
-    getBlockedUsers(@CurrentUser() currentUser: any) {
-        return this.usersService.getBlockedUsers(currentUser.id);
+    getBlockedUsers(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() currentUser: any
+    ) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) throw new ForbiddenException();
+        return this.usersService.getBlockedUsers(id);
     }
 
     @Delete(':id')
@@ -139,5 +143,58 @@ export class UsersController {
             throw new ForbiddenException('You can only delete your own user record');
         }
         return this.usersService.remove(id);
+    }
+
+    @Post(':id/2fa/generate')
+    @ApiOperation({ summary: 'Generate 2FA secret and QR code' })
+    @ApiResponse({ status: 200, description: '2FA generated' })
+    generate2FASecret(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: any) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) {
+            throw new ForbiddenException('You can only setup 2FA for your own account');
+        }
+        return this.usersService.generate2FASecret(id);
+    }
+
+    @Post(':id/2fa/verify')
+    @ApiOperation({ summary: 'Verify and enable 2FA' })
+    @ApiResponse({ status: 200, description: '2FA verified and enabled' })
+    @ApiBody({ schema: { properties: { token: { type: 'string' } } } })
+    verify2FAToken(
+        @Param('id', ParseIntPipe) id: number,
+        @Body('token') token: string,
+        @CurrentUser() currentUser: any
+    ) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) {
+            throw new ForbiddenException('You can only verify 2FA for your own account');
+        }
+        return this.usersService.verify2FAToken(id, token);
+    }
+
+    @Get(':id/sessions')
+    @ApiOperation({ summary: 'Get active sessions' })
+    getSessions(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: any) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) throw new ForbiddenException();
+        return this.usersService.getSessions(id);
+    }
+
+    @Delete(':id/sessions/:sessionId')
+    @ApiOperation({ summary: 'Revoke a session' })
+    revokeSession(@Param('id', ParseIntPipe) id: number, @Param('sessionId') sessionId: string, @CurrentUser() currentUser: any) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) throw new ForbiddenException();
+        return this.usersService.revokeSession(id, sessionId);
+    }
+
+    @Get(':id/export-data')
+    @ApiOperation({ summary: 'Export user chat data' })
+    exportData(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: any) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) throw new ForbiddenException();
+        return this.usersService.exportData(id);
+    }
+
+    @Patch(':id/deactivate')
+    @ApiOperation({ summary: 'Deactivate account for 30 days' })
+    deactivateAccount(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: any) {
+        if (!isAdmin(currentUser) && currentUser.id !== id) throw new ForbiddenException();
+        return this.usersService.deactivateAccount(id);
     }
 }

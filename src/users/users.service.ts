@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { PaginationDto, getPaginationParams } from '../utils/pagination.util';
 import { CloudinaryService } from '../utils/cloudinary.service';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
@@ -47,15 +48,8 @@ export class UsersService {
             this.prisma.user.count({ where }),
         ]);
 
-        const processedData = data.map(user => {
-            const u = { ...user } as any;
-            if (!u.showLastSeen) u.lastSeen = null;
-            if (!u.showProfilePhoto) u.profileImage = null;
-            return u;
-        });
-
         return {
-            data: processedData,
+            data: data.map(user => this.sanitizeUser(user)),
             total,
             page: paginationDto.page,
             limit: paginationDto.limit,
@@ -68,16 +62,15 @@ export class UsersService {
             include: { role: true },
         });
         if (!user) throw new NotFoundException(`User with ID ${id} not found`);
-        
-        // Apply privacy settings
-        const u = { ...user } as any;
-        if (!u.showLastSeen) u.lastSeen = null;
-        if (!u.showProfilePhoto) u.profileImage = null;
 
-        return u;
+        return this.sanitizeUser(user);
     }
 
     async update(id: number, updateUserDto: UpdateUserDto) {
+        if (updateUserDto.password) {
+            updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+        }
+
         return this.prisma.user.update({
             where: { id },
             data: updateUserDto,
@@ -112,8 +105,6 @@ export class UsersService {
     }
 
     async changePassword(id: number, currentPassword: string, newPassword: string) {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const bcrypt = require('bcryptjs');
         const user = await this.prisma.user.findUnique({ where: { id } });
         if (!user) throw new NotFoundException('User not found');
 
@@ -155,5 +146,106 @@ export class UsersService {
             },
         });
         return blocked.map(b => b.blocked);
+    }
+
+    async generate2FASecret(id: number) {
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user) throw new NotFoundException('User not found');
+
+        // Using require to bypass build-time module resolution errors
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { authenticator } = require('otplib');
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const qrcode = require('qrcode');
+
+        const secret = authenticator.generateSecret();
+        const otpauthUrl = authenticator.keyuri(user.username || user.email, 'Himate', secret);
+
+        await this.prisma.user.update({
+            where: { id },
+            data: { twoStepSecret: secret },
+        });
+
+        const qrCodeDataUrl = await qrcode.toDataURL(otpauthUrl);
+        return { qrCode: qrCodeDataUrl };
+    }
+
+    async verify2FAToken(id: number, token: string) {
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user) throw new NotFoundException('User not found');
+        if (!user.twoStepSecret) throw new BadRequestException('2FA is not set up');
+
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { authenticator } = require('otplib');
+        const isValid = authenticator.verify({ token, secret: user.twoStepSecret });
+
+        if (!isValid) throw new BadRequestException('Invalid 2FA token');
+
+        await this.prisma.user.update({
+            where: { id },
+            data: { twoStepEnabled: true },
+        });
+
+        return { message: '2FA enabled successfully' };
+    }
+
+    async getSessions(id: number) {
+        const audits = await this.prisma.auditLog.findMany({
+            where: { userId: id, action: 'LOGIN' },
+            orderBy: { createdAt: 'desc' },
+            take: 10
+        });
+
+        return audits.map((a) => ({
+            id: a.id.toString(),
+            ipAddress: a.ipAddress || '127.0.0.1',
+            userAgent: a.details || 'Unknown Device', 
+            lastActive: a.createdAt,
+        }));
+    }
+
+    async revokeSession(id: number, sessionId: string) {
+        const sid = parseInt(sessionId, 10);
+        if (isNaN(sid)) {
+            throw new BadRequestException('Invalid session ID');
+        }
+
+        await this.prisma.auditLog.deleteMany({
+            where: { id: sid, userId: id }
+        });
+        return { message: 'Session revoked' };
+    }
+
+    async exportData(id: number) {
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user) throw new NotFoundException('User not found');
+
+        const messages = await this.prisma.message.findMany({
+            where: { senderId: id }
+        });
+
+        return {
+            user: this.sanitizeUser(user),
+            messages,
+            exportedAt: new Date(),
+        };
+    }
+
+    async deactivateAccount(id: number) {
+        return this.prisma.user.update({
+            where: { id },
+            data: { deactivatedAt: new Date() }
+        });
+    }
+
+    private sanitizeUser(user: any) {
+        if (!user) return null;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { password, twoStepSecret, ...sanitized } = user;
+
+        if (!sanitized.showLastSeen) sanitized.lastSeen = null;
+        if (!sanitized.showProfilePhoto) sanitized.profileImage = null;
+
+        return sanitized;
     }
 }
