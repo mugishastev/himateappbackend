@@ -15,7 +15,13 @@ export class PagesService {
         private readonly cloudinary: CloudinaryService
     ) {
         // We initialize a Redis Pub/Sub client here for mass broadcasting functionality
-        this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+        this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+            connectTimeout: 5000,
+            enableOfflineQueue: false,
+            maxRetriesPerRequest: 3,
+            retryStrategy: (times) => Math.min(times * 100, 3000),
+        });
+        this.redisClient.on('error', (err) => console.error('[PagesService] Redis error:', err.message));
     }
 
     async createPage(userId: number, createPageDto: CreatePageDto) {
@@ -150,7 +156,11 @@ export class PagesService {
             pageId,
             post: newPost,
         };
-        await this.redisClient.publish(`page_updates_${pageId}`, JSON.stringify(broadcastPayload));
+        try {
+            await this.redisClient.publish(`page_updates_${pageId}`, JSON.stringify(broadcastPayload));
+        } catch (err: any) {
+            console.error('[PagesService] Failed to publish post update to Redis:', err.message);
+        }
 
         // 2. Offline Google Server Push Notifications
         // Send exactly 1 Firebase Request, Google fans it out to 1,000,000 phones mapping to 'page_X'

@@ -14,11 +14,12 @@ export class AdminService {
         private mailService: MailService,
     ) {
         this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-            connectTimeout: 15000,
-            maxRetriesPerRequest: null,
+            connectTimeout: 5000,
+            enableOfflineQueue: false,
+            maxRetriesPerRequest: 3,
             retryStrategy: (times) => Math.min(times * 100, 3000),
         });
-        this.redisClient.on('error', (err) => console.error('[AdminService] Redis error:', err));
+        this.redisClient.on('error', (err) => console.error('[AdminService] Redis error:', err.message));
     }
 
     async getHealth() {
@@ -43,7 +44,12 @@ export class AdminService {
         }
 
         try {
-            const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+            const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+                connectTimeout: 2000,
+                enableOfflineQueue: false,
+                maxRetriesPerRequest: 1,
+            });
+            redis.on('error', (err) => console.error('[AdminService Health Check] Redis error:', err.message));
             const pong = await redis.ping();
             result.redis.ok = pong === 'PONG';
             await redis.quit();
@@ -627,7 +633,11 @@ export class AdminService {
         }
 
         // Sync to Redis immediately for fast system-wide middleware lookups!
-        await this.redisClient.set(`system_config:${key}`, value);
+        try {
+            await this.redisClient.set(`system_config:${key}`, value);
+        } catch (err: any) {
+            console.error('[AdminService] Failed to sync setting to Redis:', err.message);
+        }
 
         return setting;
     }

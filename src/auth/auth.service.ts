@@ -9,6 +9,7 @@ import { MailService } from '../utils/mail.service';
 @Injectable()
 export class AuthService {
     private redisClient: Redis;
+    private otpFallbackMap = new Map<string, { otp: string; expiresAt: Date }>();
 
     constructor(
         private prisma: PrismaService,
@@ -16,11 +17,12 @@ export class AuthService {
         private mailService: MailService,
     ) {
         this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-            connectTimeout: 15000,
-            maxRetriesPerRequest: null,
+            connectTimeout: 5000,
+            enableOfflineQueue: false,
+            maxRetriesPerRequest: 3,
             retryStrategy: (times) => Math.min(times * 100, 3000),
         });
-        this.redisClient.on('error', (err) => console.error('[AuthService] Redis error:', err));
+        this.redisClient.on('error', (err) => console.error('[AuthService] Redis error:', err.message));
     }
 
     // ─── Register ────────────────────────────────────────────────────────────
@@ -29,11 +31,21 @@ export class AuthService {
         const { email, password, username, phoneNumber } = registerDto;
 
         // 0. Public Registration Enforcement Check
-        let publicRegistration = await this.redisClient.get('system_config:public_registration');
+        let publicRegistration: string | null = null;
+        try {
+            publicRegistration = await this.redisClient.get('system_config:public_registration');
+        } catch (err: any) {
+            console.warn('[AuthService] Redis get publicRegistration failed:', err.message);
+        }
+
         if (!publicRegistration) {
             const dbSetting = await this.prisma.setting.findFirst({ where: { key: 'public_registration' } });
             publicRegistration = dbSetting ? dbSetting.value : 'true';
-            await this.redisClient.set('system_config:public_registration', publicRegistration);
+            try {
+                await this.redisClient.set('system_config:public_registration', publicRegistration, 'EX', 3600);
+            } catch (err: any) {
+                console.warn('[AuthService] Redis set publicRegistration failed:', err.message);
+            }
         }
 
         if (publicRegistration === 'false') {
@@ -234,11 +246,21 @@ export class AuthService {
         }
 
         // Check if user verification is required
-        let requireVerification = await this.redisClient.get('system_config:require_verification');
+        let requireVerification: string | null = null;
+        try {
+            requireVerification = await this.redisClient.get('system_config:require_verification');
+        } catch (err: any) {
+            console.warn('[AuthService] Redis get requireVerification failed:', err.message);
+        }
+
         if (!requireVerification) {
             const dbSetting = await this.prisma.setting.findFirst({ where: { key: 'require_verification' } });
             requireVerification = dbSetting ? dbSetting.value : 'true';
-            await this.redisClient.set('system_config:require_verification', requireVerification);
+            try {
+                await this.redisClient.set('system_config:require_verification', requireVerification, 'EX', 3600);
+            } catch (err: any) {
+                console.warn('[AuthService] Redis set requireVerification failed:', err.message);
+            }
         }
 
         if (requireVerification === 'true' && !user.isVerified) {
@@ -390,9 +412,11 @@ export class AuthService {
 
     // ─── Validate User (used by JWT Strategy) ────────────────────────────────
 
-    async validateUser(userId: number) {
+    async validateUser(userId: any) {
+        const id = Number(userId);
+        if (isNaN(id)) return null;
         return this.prisma.user.findUnique({
-            where: { id: userId },
+            where: { id },
             include: { role: true }
         });
     }
@@ -424,24 +448,63 @@ export class AuthService {
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
         const key = `otp:${email}:${purpose}`;
         
-        await this.redisClient.set(key, JSON.stringify({ otp, expiresAt }), 'EX', 600);
+        try {
+            await this.redisClient.set(key, JSON.stringify({ otp, expiresAt }), 'EX', 600);
+        } catch (err: any) {
+            console.warn(`[AuthService] Redis set OTP failed: ${err.message}. Storing in-memory fallback.`);
+            this.otpFallbackMap.set(key, { otp, expiresAt });
+        }
         await this.mailService.sendOtpEmail(email, otp);
     }
 
     private async validateOtp(email: string, otp: string, purpose: string) {
         const key = `otp:${email}:${purpose}`;
-        const storedJson = await this.redisClient.get(key);
+        let storedJson: string | null = null;
+        let isUsingFallback = false;
 
-        if (!storedJson) throw new UnauthorizedException('Invalid or expired OTP');
+        try {
+            storedJson = await this.redisClient.get(key);
+        } catch (err: any) {
+            console.warn(`[AuthService] Redis get OTP failed: ${err.message}. Checking in-memory fallback.`);
+            isUsingFallback = true;
+        }
+
+        let stored: { otp: string; expiresAt: string | Date } | undefined;
+
+        if (isUsingFallback) {
+            const fallbackVal = this.otpFallbackMap.get(key);
+            if (fallbackVal) {
+                stored = fallbackVal;
+            }
+        } else if (storedJson) {
+            stored = JSON.parse(storedJson);
+        }
+
+        if (!stored) throw new UnauthorizedException('Invalid or expired OTP');
         
-        const stored = JSON.parse(storedJson);
         if (stored.otp !== otp) throw new UnauthorizedException('Invalid OTP');
         if (new Date() > new Date(stored.expiresAt)) {
-            await this.redisClient.del(key);
+            if (isUsingFallback) {
+                this.otpFallbackMap.delete(key);
+            } else {
+                try {
+                    await this.redisClient.del(key);
+                } catch (err: any) {
+                    console.warn(`[AuthService] Redis del OTP failed: ${err.message}`);
+                }
+            }
             throw new UnauthorizedException('OTP has expired');
         }
 
-        await this.redisClient.del(key);
+        if (isUsingFallback) {
+            this.otpFallbackMap.delete(key);
+        } else {
+            try {
+                await this.redisClient.del(key);
+            } catch (err: any) {
+                console.warn(`[AuthService] Redis del OTP failed: ${err.message}`);
+            }
+        }
     }
 
     async submitAppeal(email: string, statement: string, ip: string) {

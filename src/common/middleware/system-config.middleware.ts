@@ -9,21 +9,33 @@ export class SystemConfigMiddleware implements NestMiddleware {
 
     constructor(private prisma: PrismaService) {
         this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-            connectTimeout: 15000,
-            maxRetriesPerRequest: null,
+            connectTimeout: 5000,
+            enableOfflineQueue: false,
+            maxRetriesPerRequest: 3,
             retryStrategy: (times) => Math.min(times * 100, 3000),
         });
+        this.redisClient.on('error', (err) => console.error('[SystemConfigMiddleware] Redis error:', err.message));
     }
 
     async use(req: Request, res: Response, next: NextFunction) {
         const path = req.path || '';
 
         // ─── 1. MAINTENANCE MODE INTERCEPTION ─────────────────────────
-        let maintenanceMode = await this.redisClient.get('system_config:maintenance_mode');
+        let maintenanceMode: string | null = null;
+        try {
+            maintenanceMode = await this.redisClient.get('system_config:maintenance_mode');
+        } catch (err: any) {
+            console.warn('[SystemConfigMiddleware] Redis get maintenanceMode failed:', err.message);
+        }
+
         if (!maintenanceMode) {
             const dbSetting = await this.prisma.setting.findFirst({ where: { key: 'maintenance_mode' } });
             maintenanceMode = dbSetting ? dbSetting.value : 'false';
-            await this.redisClient.set('system_config:maintenance_mode', maintenanceMode);
+            try {
+                await this.redisClient.set('system_config:maintenance_mode', maintenanceMode, 'EX', 3600);
+            } catch (err: any) {
+                console.warn('[SystemConfigMiddleware] Redis set maintenanceMode failed:', err.message);
+            }
         }
 
         if (maintenanceMode === 'true') {
@@ -32,11 +44,21 @@ export class SystemConfigMiddleware implements NestMiddleware {
             const isApiProfile = path.includes('/auth/profile') || path.includes('/auth/me');
 
             if (!isApiAdmin && !isApiLogin && !isApiProfile) {
-                let maintenanceMessage = await this.redisClient.get('system_config:maintenance_message');
+                let maintenanceMessage: string | null = null;
+                try {
+                    maintenanceMessage = await this.redisClient.get('system_config:maintenance_message');
+                } catch (err: any) {
+                    console.warn('[SystemConfigMiddleware] Redis get maintenanceMessage failed:', err.message);
+                }
+
                 if (!maintenanceMessage) {
                     const dbMsg = await this.prisma.setting.findFirst({ where: { key: 'maintenance_message' } });
                     maintenanceMessage = dbMsg ? dbMsg.value : "We'll be right back.";
-                    await this.redisClient.set('system_config:maintenance_message', maintenanceMessage);
+                    try {
+                        await this.redisClient.set('system_config:maintenance_message', maintenanceMessage, 'EX', 3600);
+                    } catch (err: any) {
+                        console.warn('[SystemConfigMiddleware] Redis set maintenanceMessage failed:', err.message);
+                    }
                 }
 
                 throw new HttpException(
@@ -54,11 +76,21 @@ export class SystemConfigMiddleware implements NestMiddleware {
         // Rate limit unauthenticated endpoints only
         const isAuthHeaderPresent = !!req.headers.authorization;
         if (!isAuthHeaderPresent && !path.includes('/admin')) {
-            let rateLimiting = await this.redisClient.get('system_config:rate_limiting');
+            let rateLimiting: string | null = null;
+            try {
+                rateLimiting = await this.redisClient.get('system_config:rate_limiting');
+            } catch (err: any) {
+                console.warn('[SystemConfigMiddleware] Redis get rateLimiting failed:', err.message);
+            }
+
             if (!rateLimiting) {
                 const dbSetting = await this.prisma.setting.findFirst({ where: { key: 'rate_limiting' } });
                 rateLimiting = dbSetting ? dbSetting.value : 'false';
-                await this.redisClient.set('system_config:rate_limiting', rateLimiting);
+                try {
+                    await this.redisClient.set('system_config:rate_limiting', rateLimiting, 'EX', 3600);
+                } catch (err: any) {
+                    console.warn('[SystemConfigMiddleware] Redis set rateLimiting failed:', err.message);
+                }
             }
 
             if (rateLimiting === 'true') {

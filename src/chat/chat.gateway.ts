@@ -34,11 +34,12 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         private fcmService: FcmService,
     ) {
         this.redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-            connectTimeout: 15000,
-            maxRetriesPerRequest: null,
+            connectTimeout: 5000,
+            enableOfflineQueue: false,
+            maxRetriesPerRequest: 3,
             retryStrategy: (times) => Math.min(times * 100, 3000),
         });
-        this.redisClient.on('error', (err) => console.error('[ChatGateway] Redis error:', err));
+        this.redisClient.on('error', (err) => console.error('[ChatGateway] Redis error:', err.message));
     }
 
     afterInit(server: Server) {
@@ -57,11 +58,21 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
             const payload = this.jwtService.verify(token);
 
             // ─── CHECK MAINTENANCE MODE FOR SOCKET CONNECTION ─────────────
-            let maintenanceMode = await this.redisClient.get('system_config:maintenance_mode');
+            let maintenanceMode: string | null = null;
+            try {
+                maintenanceMode = await this.redisClient.get('system_config:maintenance_mode');
+            } catch (err: any) {
+                console.warn('[ChatGateway] Redis get maintenanceMode failed:', err.message);
+            }
+
             if (!maintenanceMode) {
                 const dbSetting = await this.prisma.setting.findFirst({ where: { key: 'maintenance_mode' } });
                 maintenanceMode = dbSetting ? dbSetting.value : 'false';
-                await this.redisClient.set('system_config:maintenance_mode', maintenanceMode);
+                try {
+                    await this.redisClient.set('system_config:maintenance_mode', maintenanceMode, 'EX', 3600);
+                } catch (err: any) {
+                    console.warn('[ChatGateway] Redis set maintenanceMode failed:', err.message);
+                }
             }
 
             if (maintenanceMode === 'true') {
@@ -72,10 +83,21 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
                 const isAdmin = user?.role?.name === 'ADMIN';
 
                 if (!isAdmin) {
-                    let maintenanceMessage = await this.redisClient.get('system_config:maintenance_message');
+                    let maintenanceMessage: string | null = null;
+                    try {
+                        maintenanceMessage = await this.redisClient.get('system_config:maintenance_message');
+                    } catch (err: any) {
+                        console.warn('[ChatGateway] Redis get maintenanceMessage failed:', err.message);
+                    }
+
                     if (!maintenanceMessage) {
                         const dbMsg = await this.prisma.setting.findFirst({ where: { key: 'maintenance_message' } });
                         maintenanceMessage = dbMsg ? dbMsg.value : "We'll be right back.";
+                        try {
+                            await this.redisClient.set('system_config:maintenance_message', maintenanceMessage, 'EX', 3600);
+                        } catch (err: any) {
+                            console.warn('[ChatGateway] Redis set maintenanceMessage failed:', err.message);
+                        }
                     }
                     console.log(`[ChatGateway] Disconnecting non-admin ${payload.sub} due to Maintenance Mode`);
                     client.emit('maintenance', { message: maintenanceMessage });
