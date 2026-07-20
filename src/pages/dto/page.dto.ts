@@ -13,6 +13,14 @@ export class CreatePageDto {
     @IsString()
     @IsOptional()
     bio?: string;
+
+    @IsString()
+    @IsOptional()
+    avatarUrl?: string;
+
+    @IsString()
+    @IsOptional()
+    coverPhotoUrl?: string;
 }
 
 export class CreatePagePostDto {
@@ -24,3 +32,9 @@ export class CreatePagePostDto {
     @IsUrl({}, { each: true })
     mediaUrls?: string[];
 }
+
+export class CreatePostCommentDto {
+    @IsString()
+    content: string;
+}
+

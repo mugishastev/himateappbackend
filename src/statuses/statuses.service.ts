@@ -41,7 +41,10 @@ export class StatusesService {
                 where: { expiresAt: { gt: new Date() } },
                 skip,
                 take,
-                include: { user: true },
+                include: { 
+                    user: true,
+                    views: { select: { userId: true } }
+                },
                 orderBy: { createdAt: 'desc' },
             }),
             this.prisma.status.count({ where: { expiresAt: { gt: new Date() } } }),
@@ -62,7 +65,10 @@ export class StatusesService {
                 where: { userId, expiresAt: { gt: new Date() } },
                 skip,
                 take,
-                include: { user: true },
+                include: { 
+                    user: true,
+                    views: { select: { userId: true } }
+                },
                 orderBy: { createdAt: 'desc' },
             }),
             this.prisma.status.count({ where: { userId, expiresAt: { gt: new Date() } } }),

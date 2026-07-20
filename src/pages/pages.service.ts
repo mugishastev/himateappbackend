@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePageDto, CreatePagePostDto } from './dto/page.dto';
+import { CreatePageDto, CreatePagePostDto, CreatePostCommentDto } from './dto/page.dto';
 import { Redis } from 'ioredis';
 import { FcmService } from '../notifications/fcm.service';
 import { CloudinaryService } from '../utils/cloudinary.service';
@@ -86,7 +86,7 @@ export class PagesService {
                     orderBy: { createdAt: 'desc' },
                     take: 10,
                     include: {
-                        _count: { select: { reactions: true } }
+                        _count: { select: { reactions: true, comments: true } },
                     }
                 },
             },
@@ -315,5 +315,33 @@ export class PagesService {
         }
 
         return conversation;
+    }
+    async addComment(userId: number, postId: number, dto: CreatePostCommentDto) {
+        const post = await this.prisma.pagePost.findUnique({ where: { id: postId } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        return this.prisma.postComment.create({
+            data: { postId, userId, content: dto.content },
+            include: {
+                user: { select: { id: true, username: true, profileImage: true } },
+            },
+        });
+    }
+
+    async getComments(postId: number) {
+        return this.prisma.postComment.findMany({
+            where: { postId },
+            orderBy: { createdAt: 'asc' },
+            include: {
+                user: { select: { id: true, username: true, profileImage: true } },
+            },
+        });
+    }
+
+    async deleteComment(userId: number, commentId: number) {
+        const comment = await this.prisma.postComment.findUnique({ where: { id: commentId } });
+        if (!comment) throw new NotFoundException('Comment not found');
+        if (comment.userId !== userId) throw new UnauthorizedException('Cannot delete another user\'s comment');
+        return this.prisma.postComment.delete({ where: { id: commentId } });
     }
 }

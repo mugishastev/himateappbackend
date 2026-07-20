@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Param, UseGuards, ParseIntPipe, Query, Patch, UseInterceptors, UploadedFile, Delete } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PagesService } from './pages.service';
-import { CreatePageDto, CreatePagePostDto } from './dto/page.dto';
+import { CreatePageDto, CreatePagePostDto, CreatePostCommentDto } from './dto/page.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -36,10 +36,6 @@ export class PagesController {
         return this.pagesService.updatePage(user.id, pageId, dto);
     }
 
-    @Get(':handle')
-    getPageByHandle(@Param('handle') handle: string) {
-        return this.pagesService.getPageByHandle(handle);
-    }
 
     @UseGuards(JwtAuthGuard)
     @Post(':id/follow')
@@ -109,5 +105,47 @@ export class PagesController {
     @Post('posts/:id/delete')
     deletePost(@CurrentUser() user: any, @Param('id', ParseIntPipe) postId: number) {
         return this.pagesService.deletePost(user.id, postId);
+    }
+
+    // ── Comments ──────────────────────────────────────────────────────────
+    @UseGuards(JwtAuthGuard)
+    @Post('posts/:id/comments')
+    addComment(
+        @CurrentUser() user: any,
+        @Param('id', ParseIntPipe) postId: number,
+        @Body() dto: CreatePostCommentDto,
+    ) {
+        return this.pagesService.addComment(user.id, postId, dto);
+    }
+
+    @Get('posts/:id/comments')
+    getComments(@Param('id', ParseIntPipe) postId: number) {
+        return this.pagesService.getComments(postId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Delete('comments/:id')
+    deleteComment(@CurrentUser() user: any, @Param('id', ParseIntPipe) commentId: number) {
+        return this.pagesService.deleteComment(user.id, commentId);
+    }
+
+    @Get(':handle')
+    getPageByHandle(@Param('handle') handle: string) {
+        return this.pagesService.getPageByHandle(handle);
+    }
+
+    // ── Image uploads ─────────────────────────────────────────────────────
+    @UseGuards(JwtAuthGuard)
+    @Post('upload/avatar')
+    @UseInterceptors(FileInterceptor('file'))
+    uploadAvatar(@UploadedFile() file: any) {
+        return this.pagesService.uploadMedia(file);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('upload/cover')
+    @UseInterceptors(FileInterceptor('file'))
+    uploadCover(@UploadedFile() file: any) {
+        return this.pagesService.uploadMedia(file);
     }
 }

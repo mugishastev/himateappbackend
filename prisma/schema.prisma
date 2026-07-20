@@ -50,6 +50,7 @@ model User {
   pages              Page[]                    @relation("UserPages")
   followedPages      PageFollower[]            @relation("UserFollowedPages")
   postReactions      PostReaction[]            @relation("UserPostReactions")
+  postComments       PostComment[]             @relation("UserPostComments")
   scheduledCalls     ScheduledCall[]           @relation("ScheduledCaller")
   scheduledReceived  ScheduledCall[]           @relation("ScheduledReceiver")
   settings           Setting[]
@@ -260,6 +261,7 @@ model PagePost {
   createdAt DateTime       @default(now())
   page      Page           @relation(fields: [pageId], references: [id])
   reactions PostReaction[]
+  comments  PostComment[]
 }
 
 model PostReaction {
@@ -270,6 +272,17 @@ model PostReaction {
   post   PagePost @relation(fields: [postId], references: [id])
   user   User     @relation("UserPostReactions", fields: [userId], references: [id])
 }
+
+model PostComment {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  content   String
+  createdAt DateTime @default(now())
+  post      PagePost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserPostComments", fields: [userId], references: [id])
+}
+
 
 enum MessageType {
   TEXT
